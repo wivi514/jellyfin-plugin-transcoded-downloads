@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Jellyfin.Plugin" Version="10.8.0" />
+    <PackageReference Include="Jellyfin.Api" Version="10.8.0" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="6.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Pages\configPage.html" />
+    <EmbeddedResource Include="Pages\configPage.js" />
+    <EmbeddedResource Include="Web\injected-download-button.js" />
+  </ItemGroup>
+
+</Project>
+```
