@@ -1,3 +1,5 @@
+using System;
+
 namespace Jellyfin.Plugin.TranscodedDownloads.Enums
 {
     /// <summary>
