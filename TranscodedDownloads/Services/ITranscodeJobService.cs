@@ -53,5 +53,12 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
             string inputPath,
             PluginConfiguration configuration,
             CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Gets the completed output file for a job.
+        /// </summary>
+        /// <param name="jobId">The job ID.</param>
+        /// <returns>The completed file lookup result.</returns>
+        CompletedJobFile GetCompletedJobFile(Guid jobId);
     }
 }

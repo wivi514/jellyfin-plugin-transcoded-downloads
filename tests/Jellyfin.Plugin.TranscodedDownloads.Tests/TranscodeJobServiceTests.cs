@@ -304,6 +304,66 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
             Assert.False(_processRunner.WasCalled);
         }
 
+        [Fact]
+        public async Task GetCompletedJobFile_WhenJobCompleted_ReturnsAvailableFile()
+        {
+            var configuration = CreateConfiguration();
+            var service = CreateService();
+            var createdJob = service.CreateJob(
+                new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" },
+                configuration);
+            _processRunner.OutputBytes = new byte[] { 1, 2, 3 };
+            await service.StartJobAsync(createdJob.Id, "/media/input.mkv", configuration, CancellationToken.None);
+
+            var file = service.GetCompletedJobFile(createdJob.Id);
+
+            Assert.Equal(CompletedJobFileStatus.Available, file.Status);
+            Assert.Equal(createdJob.OutputPath, file.Path);
+            Assert.Equal(createdJob.OutputFileName, file.DownloadFileName);
+            Assert.Equal("video/mp4", file.ContentType);
+        }
+
+        [Fact]
+        public void GetCompletedJobFile_WhenJobIsQueued_ReturnsNotCompleted()
+        {
+            var configuration = CreateConfiguration();
+            var service = CreateService();
+            var createdJob = service.CreateJob(
+                new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" },
+                configuration);
+
+            var file = service.GetCompletedJobFile(createdJob.Id);
+
+            Assert.Equal(CompletedJobFileStatus.NotCompleted, file.Status);
+        }
+
+        [Fact]
+        public void GetCompletedJobFile_WhenJobDoesNotExist_ReturnsNotFound()
+        {
+            var service = CreateService();
+
+            var file = service.GetCompletedJobFile(Guid.NewGuid());
+
+            Assert.Equal(CompletedJobFileStatus.NotFound, file.Status);
+        }
+
+        [Fact]
+        public async Task GetCompletedJobFile_WhenCompletedFileIsMissing_ReturnsFileMissing()
+        {
+            var configuration = CreateConfiguration();
+            var service = CreateService();
+            var createdJob = service.CreateJob(
+                new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" },
+                configuration);
+            _processRunner.OutputBytes = new byte[] { 1, 2, 3 };
+            await service.StartJobAsync(createdJob.Id, "/media/input.mkv", configuration, CancellationToken.None);
+            File.Delete(createdJob.OutputPath!);
+
+            var file = service.GetCompletedJobFile(createdJob.Id);
+
+            Assert.Equal(CompletedJobFileStatus.FileMissing, file.Status);
+        }
+
         private TranscodeJobService CreateService()
         {
             return new TranscodeJobService(new PresetValidator(), new TempFileStore(_tempRoot), _processRunner);

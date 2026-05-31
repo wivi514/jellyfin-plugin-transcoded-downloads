@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Jellyfin.Plugin.TranscodedDownloads.Enums;
 using Jellyfin.Plugin.TranscodedDownloads.Exceptions;
 using Jellyfin.Plugin.TranscodedDownloads.Models;
 using Jellyfin.Plugin.TranscodedDownloads.Services;
@@ -127,6 +128,25 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Controllers
             }
 
             return NoContent();
+        }
+
+        /// <summary>
+        /// Downloads the completed output file for a transcoded download job.
+        /// </summary>
+        /// <param name="jobId">The job ID.</param>
+        /// <returns>The completed output file.</returns>
+        [HttpGet("Jobs/{jobId}/File")]
+        public IActionResult GetJobFile(Guid jobId)
+        {
+            var file = _transcodeJobService.GetCompletedJobFile(jobId);
+            return file.Status switch
+            {
+                CompletedJobFileStatus.NotFound => NotFound(),
+                CompletedJobFileStatus.NotCompleted => Conflict("The transcode job has not completed."),
+                CompletedJobFileStatus.FileMissing => NotFound("The completed transcode file no longer exists."),
+                CompletedJobFileStatus.Available => PhysicalFile(file.Path!, file.ContentType!, file.DownloadFileName),
+                _ => StatusCode(500)
+            };
         }
     }
 }

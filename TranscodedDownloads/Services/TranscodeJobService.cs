@@ -261,6 +261,37 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
             }
         }
 
+        /// <inheritdoc />
+        public CompletedJobFile GetCompletedJobFile(Guid jobId)
+        {
+            lock (_syncRoot)
+            {
+                var job = _jobs.FirstOrDefault(candidate => candidate.Id == jobId);
+                if (job == null)
+                {
+                    return new CompletedJobFile { Status = CompletedJobFileStatus.NotFound };
+                }
+
+                if (job.Status != JobStatus.Completed)
+                {
+                    return new CompletedJobFile { Status = CompletedJobFileStatus.NotCompleted };
+                }
+
+                if (string.IsNullOrWhiteSpace(job.OutputPath) || !File.Exists(job.OutputPath))
+                {
+                    return new CompletedJobFile { Status = CompletedJobFileStatus.FileMissing };
+                }
+
+                return new CompletedJobFile
+                {
+                    Status = CompletedJobFileStatus.Available,
+                    Path = job.OutputPath,
+                    DownloadFileName = job.OutputFileName ?? Path.GetFileName(job.OutputPath),
+                    ContentType = GetContentType(job.OutputFileName ?? job.OutputPath)
+                };
+            }
+        }
+
         internal bool TryUpdateJobStatus(Guid jobId, JobStatus status)
         {
             lock (_syncRoot)
@@ -321,6 +352,21 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
             }
 
             return System.IO.Directory.GetParent(job.TempDirectory)?.FullName ?? string.Empty;
+        }
+
+        private static string GetContentType(string fileName)
+        {
+            return Path.GetExtension(fileName).ToLowerInvariant() switch
+            {
+                ".mp4" => "video/mp4",
+                ".mkv" => "video/x-matroska",
+                ".webm" => "video/webm",
+                ".mp3" => "audio/mpeg",
+                ".m4a" => "audio/mp4",
+                ".ogg" => "audio/ogg",
+                ".flac" => "audio/flac",
+                _ => "application/octet-stream"
+            };
         }
     }
 }
