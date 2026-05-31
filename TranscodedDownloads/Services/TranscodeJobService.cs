@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Jellyfin.Plugin.TranscodedDownloads.Configuration;
 using Jellyfin.Plugin.TranscodedDownloads.Enums;
 using Jellyfin.Plugin.TranscodedDownloads.Exceptions;
@@ -17,6 +20,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
         private readonly List<DownloadJobDto> _jobs = new List<DownloadJobDto>();
         private readonly IPresetValidator _presetValidator;
         private readonly ITempFileStore _tempFileStore;
+        private readonly ITranscodeProcessRunner _processRunner;
 
         /// <summary>
         /// Initializes the shared job service instance used by the controller until DI is wired.
@@ -27,7 +31,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
         /// Initializes a new instance of the <see cref="TranscodeJobService"/> class.
         /// </summary>
         public TranscodeJobService()
-            : this(new PresetValidator(), new TempFileStore())
+            : this(new PresetValidator(), new TempFileStore(), new TranscodeProcessRunner())
         {
         }
 
@@ -36,7 +40,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
         /// </summary>
         /// <param name="presetValidator">The preset validator.</param>
         public TranscodeJobService(IPresetValidator presetValidator)
-            : this(presetValidator, new TempFileStore())
+            : this(presetValidator, new TempFileStore(), new TranscodeProcessRunner())
         {
         }
 
@@ -46,9 +50,24 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
         /// <param name="presetValidator">The preset validator.</param>
         /// <param name="tempFileStore">The temp file store.</param>
         public TranscodeJobService(IPresetValidator presetValidator, ITempFileStore tempFileStore)
+            : this(presetValidator, tempFileStore, new TranscodeProcessRunner())
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TranscodeJobService"/> class.
+        /// </summary>
+        /// <param name="presetValidator">The preset validator.</param>
+        /// <param name="tempFileStore">The temp file store.</param>
+        /// <param name="processRunner">The transcode process runner.</param>
+        public TranscodeJobService(
+            IPresetValidator presetValidator,
+            ITempFileStore tempFileStore,
+            ITranscodeProcessRunner processRunner)
         {
             _presetValidator = presetValidator ?? throw new ArgumentNullException(nameof(presetValidator));
             _tempFileStore = tempFileStore ?? throw new ArgumentNullException(nameof(tempFileStore));
+            _processRunner = processRunner ?? throw new ArgumentNullException(nameof(processRunner));
         }
 
         /// <inheritdoc />
@@ -165,6 +184,83 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
             }
         }
 
+        /// <inheritdoc />
+        public async Task<bool> StartJobAsync(
+            Guid jobId,
+            string inputPath,
+            PluginConfiguration configuration,
+            CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(inputPath))
+            {
+                throw new ArgumentException("Input path is required.", nameof(inputPath));
+            }
+
+            if (configuration == null)
+            {
+                throw new ArgumentNullException(nameof(configuration));
+            }
+
+            DownloadJobDto jobSnapshot;
+            AdminTranscodePreset preset;
+            CapabilityProfile capabilityProfile;
+            lock (_syncRoot)
+            {
+                var job = _jobs.FirstOrDefault(candidate => candidate.Id == jobId);
+                if (job == null || job.Status != JobStatus.Queued)
+                {
+                    return false;
+                }
+
+                if (string.IsNullOrWhiteSpace(job.OutputPath))
+                {
+                    MarkJobFailed(job, "The job does not have a reserved output path.");
+                    return true;
+                }
+
+                preset = configuration.Presets.FirstOrDefault(candidate => candidate.Id == job.PresetId)
+                    ?? throw new InvalidPresetException("The requested preset does not exist.");
+                capabilityProfile = configuration.CapabilityProfiles.FirstOrDefault(candidate => candidate.Id == preset.CapabilityProfileId)
+                    ?? throw new InvalidPresetException("The requested preset does not reference a configured capability profile.");
+
+                job.Status = JobStatus.Running;
+                job.StartedAt = DateTimeOffset.UtcNow;
+                job.ProgressPercent = 0;
+                jobSnapshot = Clone(job);
+            }
+
+            var result = await _processRunner.RunAsync(
+                preset,
+                capabilityProfile,
+                inputPath,
+                jobSnapshot.OutputPath!,
+                cancellationToken).ConfigureAwait(false);
+
+            lock (_syncRoot)
+            {
+                var job = _jobs.FirstOrDefault(candidate => candidate.Id == jobId);
+                if (job == null || job.Status == JobStatus.Cancelled)
+                {
+                    return true;
+                }
+
+                if (result.Succeeded)
+                {
+                    job.Status = JobStatus.Completed;
+                    job.ProgressPercent = 100;
+                    job.CompletedAt = DateTimeOffset.UtcNow;
+                    job.OutputSizeBytes = File.Exists(job.OutputPath) ? new FileInfo(job.OutputPath).Length : null;
+                    job.ErrorMessage = null;
+                }
+                else
+                {
+                    MarkJobFailed(job, result.ErrorMessage ?? "The transcode failed.");
+                }
+
+                return true;
+            }
+        }
+
         internal bool TryUpdateJobStatus(Guid jobId, JobStatus status)
         {
             lock (_syncRoot)
@@ -187,6 +283,13 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
 
                 return true;
             }
+        }
+
+        private static void MarkJobFailed(DownloadJobDto job, string errorMessage)
+        {
+            job.Status = JobStatus.Failed;
+            job.ErrorMessage = errorMessage;
+            job.CompletedAt = DateTimeOffset.UtcNow;
         }
 
         private static DownloadJobDto Clone(DownloadJobDto job)

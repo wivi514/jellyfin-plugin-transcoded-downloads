@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Jellyfin.Plugin.TranscodedDownloads.Configuration;
 using Jellyfin.Plugin.TranscodedDownloads.Enums;
 using Jellyfin.Plugin.TranscodedDownloads.Exceptions;
@@ -14,10 +16,12 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
     public sealed class TranscodeJobServiceTests : IDisposable
     {
         private readonly string _tempRoot;
+        private readonly FakeTranscodeProcessRunner _processRunner;
 
         public TranscodeJobServiceTests()
         {
             _tempRoot = Path.Combine(Path.GetTempPath(), "jellyfin-transcode-job-service-tests", Guid.NewGuid().ToString("N"));
+            _processRunner = new FakeTranscodeProcessRunner();
         }
 
         public void Dispose()
@@ -228,9 +232,81 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
             Assert.Throws<ArgumentException>(() => service.CreateJob(request, configuration));
         }
 
+        [Fact]
+        public async Task StartJobAsync_WhenJobCompletes_MarksJobCompleted()
+        {
+            var configuration = CreateConfiguration();
+            var service = CreateService();
+            var createdJob = service.CreateJob(
+                new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" },
+                configuration);
+            _processRunner.OutputBytes = new byte[] { 1, 2, 3 };
+
+            var started = await service.StartJobAsync(createdJob.Id, "/media/input.mkv", configuration, CancellationToken.None);
+            var job = service.GetJob(createdJob.Id);
+
+            Assert.True(started);
+            Assert.NotNull(job);
+            Assert.Equal(JobStatus.Completed, job.Status);
+            Assert.Equal(100, job.ProgressPercent);
+            Assert.NotNull(job.StartedAt);
+            Assert.NotNull(job.CompletedAt);
+            Assert.Equal(3, job.OutputSizeBytes);
+            Assert.Null(job.ErrorMessage);
+            Assert.Equal("/media/input.mkv", _processRunner.InputPath);
+            Assert.Equal(createdJob.OutputPath, _processRunner.OutputPath);
+        }
+
+        [Fact]
+        public async Task StartJobAsync_WhenProcessFails_MarksJobFailed()
+        {
+            var configuration = CreateConfiguration();
+            var service = CreateService();
+            var createdJob = service.CreateJob(
+                new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" },
+                configuration);
+            _processRunner.Result = TranscodeProcessResult.Failure(1, "encoder failed");
+
+            var started = await service.StartJobAsync(createdJob.Id, "/media/input.mkv", configuration, CancellationToken.None);
+            var job = service.GetJob(createdJob.Id);
+
+            Assert.True(started);
+            Assert.NotNull(job);
+            Assert.Equal(JobStatus.Failed, job.Status);
+            Assert.Equal("encoder failed", job.ErrorMessage);
+            Assert.NotNull(job.CompletedAt);
+        }
+
+        [Fact]
+        public async Task StartJobAsync_WhenJobDoesNotExist_ReturnsFalse()
+        {
+            var service = CreateService();
+
+            var started = await service.StartJobAsync(Guid.NewGuid(), "/media/input.mkv", CreateConfiguration(), CancellationToken.None);
+
+            Assert.False(started);
+            Assert.False(_processRunner.WasCalled);
+        }
+
+        [Fact]
+        public async Task StartJobAsync_WhenJobIsNotQueued_ReturnsFalse()
+        {
+            var configuration = CreateConfiguration();
+            var service = CreateService();
+            var createdJob = service.CreateJob(
+                new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" },
+                configuration);
+            service.TryUpdateJobStatus(createdJob.Id, JobStatus.Completed);
+
+            var started = await service.StartJobAsync(createdJob.Id, "/media/input.mkv", configuration, CancellationToken.None);
+
+            Assert.False(started);
+            Assert.False(_processRunner.WasCalled);
+        }
+
         private TranscodeJobService CreateService()
         {
-            return new TranscodeJobService(new PresetValidator(), new TempFileStore(_tempRoot));
+            return new TranscodeJobService(new PresetValidator(), new TempFileStore(_tempRoot), _processRunner);
         }
 
         private static PluginConfiguration CreateConfiguration()
@@ -272,6 +348,37 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
                 CapabilityProfiles = new List<CapabilityProfile> { profile },
                 Presets = new List<AdminTranscodePreset> { preset }
             };
+        }
+
+        private sealed class FakeTranscodeProcessRunner : ITranscodeProcessRunner
+        {
+            public TranscodeProcessResult Result { get; set; } = TranscodeProcessResult.Success();
+
+            public byte[] OutputBytes { get; set; } = Array.Empty<byte>();
+
+            public bool WasCalled { get; private set; }
+
+            public string? InputPath { get; private set; }
+
+            public string? OutputPath { get; private set; }
+
+            public Task<TranscodeProcessResult> RunAsync(
+                AdminTranscodePreset preset,
+                CapabilityProfile capabilityProfile,
+                string inputPath,
+                string outputPath,
+                CancellationToken cancellationToken)
+            {
+                WasCalled = true;
+                InputPath = inputPath;
+                OutputPath = outputPath;
+                if (Result.Succeeded)
+                {
+                    File.WriteAllBytes(outputPath, OutputBytes);
+                }
+
+                return Task.FromResult(Result);
+            }
         }
     }
 }

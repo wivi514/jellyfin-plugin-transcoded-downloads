@@ -1,5 +1,7 @@
-using System.Collections.Generic;
 using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using Jellyfin.Plugin.TranscodedDownloads.Configuration;
 using Jellyfin.Plugin.TranscodedDownloads.Models;
 
@@ -37,5 +39,19 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
         /// <param name="jobId">The job ID.</param>
         /// <returns>True when the job exists; otherwise, false.</returns>
         bool DeleteJob(Guid jobId);
+
+        /// <summary>
+        /// Starts a queued transcode job.
+        /// </summary>
+        /// <param name="jobId">The job ID.</param>
+        /// <param name="inputPath">The input media path.</param>
+        /// <param name="configuration">The plugin configuration.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>True when a queued job was found and processed; otherwise, false.</returns>
+        Task<bool> StartJobAsync(
+            Guid jobId,
+            string inputPath,
+            PluginConfiguration configuration,
+            CancellationToken cancellationToken);
     }
 }
