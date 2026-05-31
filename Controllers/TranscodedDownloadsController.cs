@@ -77,6 +77,10 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Controllers
             {
                 return BadRequest(ex.Message);
             }
+            catch (MediaItemResolutionException ex)
+            {
+                return BadRequest(ex.Message);
+            }
             catch (ArgumentException ex)
             {
                 return BadRequest(ex.Message);

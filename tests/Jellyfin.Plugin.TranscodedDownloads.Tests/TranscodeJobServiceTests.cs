@@ -17,11 +17,13 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
     {
         private readonly string _tempRoot;
         private readonly FakeTranscodeProcessRunner _processRunner;
+        private readonly FakeMediaItemResolver _mediaItemResolver;
 
         public TranscodeJobServiceTests()
         {
             _tempRoot = Path.Combine(Path.GetTempPath(), "jellyfin-transcode-job-service-tests", Guid.NewGuid().ToString("N"));
             _processRunner = new FakeTranscodeProcessRunner();
+            _mediaItemResolver = new FakeMediaItemResolver();
         }
 
         public void Dispose()
@@ -56,6 +58,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
             Assert.NotNull(job.OutputPath);
             Assert.NotNull(job.TempDirectory);
             Assert.EndsWith(".mp4", job.OutputFileName, StringComparison.Ordinal);
+            Assert.StartsWith("Test Movie - ", job.OutputFileName, StringComparison.Ordinal);
             Assert.True(Directory.Exists(job.TempDirectory));
             Assert.StartsWith(job.TempDirectory, job.OutputPath, StringComparison.Ordinal);
             Assert.True(job.CreatedAt <= DateTimeOffset.UtcNow);
@@ -75,6 +78,63 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
             };
 
             Assert.Throws<InvalidPresetException>(() => service.CreateJob(request, configuration));
+        }
+
+        [Fact]
+        public void CreateJob_WhenItemCannotBeResolved_ThrowsMediaItemResolutionException()
+        {
+            var configuration = CreateConfiguration();
+            var service = CreateService();
+            _mediaItemResolver.Item = null;
+            var request = new CreateDownloadJobRequest
+            {
+                ItemId = Guid.NewGuid(),
+                PresetId = "video-preset"
+            };
+
+            Assert.Throws<MediaItemResolutionException>(() => service.CreateJob(request, configuration));
+        }
+
+        [Fact]
+        public void CreateJob_WhenResolvedItemHasNoPath_ThrowsMediaItemResolutionException()
+        {
+            var configuration = CreateConfiguration();
+            var service = CreateService();
+            _mediaItemResolver.Item = new MediaItemInfo
+            {
+                ItemId = Guid.NewGuid(),
+                Name = "Missing Path",
+                Path = string.Empty,
+                IsVideo = true
+            };
+            var request = new CreateDownloadJobRequest
+            {
+                ItemId = Guid.NewGuid(),
+                PresetId = "video-preset"
+            };
+
+            Assert.Throws<MediaItemResolutionException>(() => service.CreateJob(request, configuration));
+        }
+
+        [Fact]
+        public async Task StartJobAsync_WhenResolvedItemHasNoPath_ThrowsMediaItemResolutionException()
+        {
+            var configuration = CreateConfiguration();
+            var service = CreateService();
+            var createdJob = service.CreateJob(
+                new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" },
+                configuration);
+            _mediaItemResolver.Item = new MediaItemInfo
+            {
+                ItemId = createdJob.ItemId,
+                Name = "Missing Path",
+                Path = string.Empty,
+                IsVideo = true
+            };
+
+            await Assert.ThrowsAsync<MediaItemResolutionException>(
+                () => service.StartJobAsync(createdJob.Id, configuration, CancellationToken.None));
+            Assert.False(_processRunner.WasCalled);
         }
 
         [Fact]
@@ -242,7 +302,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
                 configuration);
             _processRunner.OutputBytes = new byte[] { 1, 2, 3 };
 
-            var started = await service.StartJobAsync(createdJob.Id, "/media/input.mkv", configuration, CancellationToken.None);
+            var started = await service.StartJobAsync(createdJob.Id, configuration, CancellationToken.None);
             var job = service.GetJob(createdJob.Id);
 
             Assert.True(started);
@@ -253,7 +313,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
             Assert.NotNull(job.CompletedAt);
             Assert.Equal(3, job.OutputSizeBytes);
             Assert.Null(job.ErrorMessage);
-            Assert.Equal("/media/input.mkv", _processRunner.InputPath);
+            Assert.Equal("/media/Test Movie.mkv", _processRunner.InputPath);
             Assert.Equal(createdJob.OutputPath, _processRunner.OutputPath);
         }
 
@@ -267,7 +327,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
                 configuration);
             _processRunner.Result = TranscodeProcessResult.Failure(1, "encoder failed");
 
-            var started = await service.StartJobAsync(createdJob.Id, "/media/input.mkv", configuration, CancellationToken.None);
+            var started = await service.StartJobAsync(createdJob.Id, configuration, CancellationToken.None);
             var job = service.GetJob(createdJob.Id);
 
             Assert.True(started);
@@ -282,7 +342,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
         {
             var service = CreateService();
 
-            var started = await service.StartJobAsync(Guid.NewGuid(), "/media/input.mkv", CreateConfiguration(), CancellationToken.None);
+            var started = await service.StartJobAsync(Guid.NewGuid(), CreateConfiguration(), CancellationToken.None);
 
             Assert.False(started);
             Assert.False(_processRunner.WasCalled);
@@ -298,7 +358,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
                 configuration);
             service.TryUpdateJobStatus(createdJob.Id, JobStatus.Completed);
 
-            var started = await service.StartJobAsync(createdJob.Id, "/media/input.mkv", configuration, CancellationToken.None);
+            var started = await service.StartJobAsync(createdJob.Id, configuration, CancellationToken.None);
 
             Assert.False(started);
             Assert.False(_processRunner.WasCalled);
@@ -313,7 +373,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
                 new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" },
                 configuration);
             _processRunner.OutputBytes = new byte[] { 1, 2, 3 };
-            await service.StartJobAsync(createdJob.Id, "/media/input.mkv", configuration, CancellationToken.None);
+            await service.StartJobAsync(createdJob.Id, configuration, CancellationToken.None);
 
             var file = service.GetCompletedJobFile(createdJob.Id);
 
@@ -356,7 +416,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
                 new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" },
                 configuration);
             _processRunner.OutputBytes = new byte[] { 1, 2, 3 };
-            await service.StartJobAsync(createdJob.Id, "/media/input.mkv", configuration, CancellationToken.None);
+            await service.StartJobAsync(createdJob.Id, configuration, CancellationToken.None);
             File.Delete(createdJob.OutputPath!);
 
             var file = service.GetCompletedJobFile(createdJob.Id);
@@ -366,7 +426,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
 
         private TranscodeJobService CreateService()
         {
-            return new TranscodeJobService(new PresetValidator(), new TempFileStore(_tempRoot), _processRunner);
+            return new TranscodeJobService(new PresetValidator(), new TempFileStore(_tempRoot), _processRunner, _mediaItemResolver);
         }
 
         private static PluginConfiguration CreateConfiguration()
@@ -438,6 +498,40 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
                 }
 
                 return Task.FromResult(Result);
+            }
+        }
+
+        private sealed class FakeMediaItemResolver : IMediaItemResolver
+        {
+            public MediaItemInfo? Item { get; set; } = new MediaItemInfo
+            {
+                ItemId = Guid.NewGuid(),
+                Name = "Test Movie",
+                Path = "/media/Test Movie.mkv",
+                IsVideo = true,
+                IsAudio = false
+            };
+
+            public MediaItemInfo ResolveItem(Guid itemId)
+            {
+                if (Item == null)
+                {
+                    throw new MediaItemResolutionException("The requested media item does not exist.");
+                }
+
+                if (string.IsNullOrWhiteSpace(Item.Path))
+                {
+                    throw new MediaItemResolutionException("The requested media item does not have a source path.");
+                }
+
+                return new MediaItemInfo
+                {
+                    ItemId = itemId,
+                    Name = Item.Name,
+                    Path = Item.Path,
+                    IsVideo = Item.IsVideo,
+                    IsAudio = Item.IsAudio
+                };
             }
         }
     }

@@ -44,13 +44,11 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
         /// Starts a queued transcode job.
         /// </summary>
         /// <param name="jobId">The job ID.</param>
-        /// <param name="inputPath">The input media path.</param>
         /// <param name="configuration">The plugin configuration.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>True when a queued job was found and processed; otherwise, false.</returns>
         Task<bool> StartJobAsync(
             Guid jobId,
-            string inputPath,
             PluginConfiguration configuration,
             CancellationToken cancellationToken);
 

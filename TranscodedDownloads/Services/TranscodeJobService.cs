@@ -21,6 +21,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
         private readonly IPresetValidator _presetValidator;
         private readonly ITempFileStore _tempFileStore;
         private readonly ITranscodeProcessRunner _processRunner;
+        private readonly IMediaItemResolver _mediaItemResolver;
 
         /// <summary>
         /// Initializes the shared job service instance used by the controller until DI is wired.
@@ -31,7 +32,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
         /// Initializes a new instance of the <see cref="TranscodeJobService"/> class.
         /// </summary>
         public TranscodeJobService()
-            : this(new PresetValidator(), new TempFileStore(), new TranscodeProcessRunner())
+            : this(new PresetValidator(), new TempFileStore(), new TranscodeProcessRunner(), new UnavailableMediaItemResolver())
         {
         }
 
@@ -40,7 +41,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
         /// </summary>
         /// <param name="presetValidator">The preset validator.</param>
         public TranscodeJobService(IPresetValidator presetValidator)
-            : this(presetValidator, new TempFileStore(), new TranscodeProcessRunner())
+            : this(presetValidator, new TempFileStore(), new TranscodeProcessRunner(), new UnavailableMediaItemResolver())
         {
         }
 
@@ -50,7 +51,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
         /// <param name="presetValidator">The preset validator.</param>
         /// <param name="tempFileStore">The temp file store.</param>
         public TranscodeJobService(IPresetValidator presetValidator, ITempFileStore tempFileStore)
-            : this(presetValidator, tempFileStore, new TranscodeProcessRunner())
+            : this(presetValidator, tempFileStore, new TranscodeProcessRunner(), new UnavailableMediaItemResolver())
         {
         }
 
@@ -60,14 +61,17 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
         /// <param name="presetValidator">The preset validator.</param>
         /// <param name="tempFileStore">The temp file store.</param>
         /// <param name="processRunner">The transcode process runner.</param>
+        /// <param name="mediaItemResolver">The media item resolver.</param>
         public TranscodeJobService(
             IPresetValidator presetValidator,
             ITempFileStore tempFileStore,
-            ITranscodeProcessRunner processRunner)
+            ITranscodeProcessRunner processRunner,
+            IMediaItemResolver mediaItemResolver)
         {
             _presetValidator = presetValidator ?? throw new ArgumentNullException(nameof(presetValidator));
             _tempFileStore = tempFileStore ?? throw new ArgumentNullException(nameof(tempFileStore));
             _processRunner = processRunner ?? throw new ArgumentNullException(nameof(processRunner));
+            _mediaItemResolver = mediaItemResolver ?? throw new ArgumentNullException(nameof(mediaItemResolver));
         }
 
         /// <inheritdoc />
@@ -99,6 +103,9 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
                 throw new InvalidPresetException("The requested preset does not exist.");
             }
 
+            var mediaItem = _mediaItemResolver.ResolveItem(request.ItemId);
+            ValidatePresetMatchesMediaType(preset, mediaItem);
+
             var validationResult = _presetValidator.Validate(preset, configuration.CapabilityProfiles);
             if (!validationResult.IsValid)
             {
@@ -117,7 +124,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
                 var reservation = _tempFileStore.ReserveOutputFile(
                     configuration,
                     jobId,
-                    request.ItemId.ToString("N"),
+                    mediaItem.Name,
                     preset);
 
                 var job = new DownloadJobDto
@@ -187,15 +194,9 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
         /// <inheritdoc />
         public async Task<bool> StartJobAsync(
             Guid jobId,
-            string inputPath,
             PluginConfiguration configuration,
             CancellationToken cancellationToken)
         {
-            if (string.IsNullOrWhiteSpace(inputPath))
-            {
-                throw new ArgumentException("Input path is required.", nameof(inputPath));
-            }
-
             if (configuration == null)
             {
                 throw new ArgumentNullException(nameof(configuration));
@@ -204,6 +205,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
             DownloadJobDto jobSnapshot;
             AdminTranscodePreset preset;
             CapabilityProfile capabilityProfile;
+            MediaItemInfo mediaItem;
             lock (_syncRoot)
             {
                 var job = _jobs.FirstOrDefault(candidate => candidate.Id == jobId);
@@ -222,6 +224,8 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
                     ?? throw new InvalidPresetException("The requested preset does not exist.");
                 capabilityProfile = configuration.CapabilityProfiles.FirstOrDefault(candidate => candidate.Id == preset.CapabilityProfileId)
                     ?? throw new InvalidPresetException("The requested preset does not reference a configured capability profile.");
+                mediaItem = _mediaItemResolver.ResolveItem(job.ItemId);
+                ValidatePresetMatchesMediaType(preset, mediaItem);
 
                 job.Status = JobStatus.Running;
                 job.StartedAt = DateTimeOffset.UtcNow;
@@ -232,7 +236,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
             var result = await _processRunner.RunAsync(
                 preset,
                 capabilityProfile,
-                inputPath,
+                mediaItem.Path,
                 jobSnapshot.OutputPath!,
                 cancellationToken).ConfigureAwait(false);
 
@@ -321,6 +325,24 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
             job.Status = JobStatus.Failed;
             job.ErrorMessage = errorMessage;
             job.CompletedAt = DateTimeOffset.UtcNow;
+        }
+
+        private static void ValidatePresetMatchesMediaType(AdminTranscodePreset preset, MediaItemInfo mediaItem)
+        {
+            if (mediaItem == null)
+            {
+                throw new ArgumentNullException(nameof(mediaItem));
+            }
+
+            if (preset.IsAudioOnlyPreset && !mediaItem.IsAudio)
+            {
+                throw new InvalidPresetException("The requested audio-only preset cannot be used with a non-audio item.");
+            }
+
+            if (preset.IsVideoPreset && !mediaItem.IsVideo)
+            {
+                throw new InvalidPresetException("The requested video preset cannot be used with a non-video item.");
+            }
         }
 
         private static DownloadJobDto Clone(DownloadJobDto job)
