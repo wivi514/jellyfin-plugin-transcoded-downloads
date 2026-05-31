@@ -33,4 +33,3 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Configuration
         public List<string> Warnings { get; set; }
     }
 }
-```

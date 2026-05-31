@@ -1,5 +1,6 @@
 using System;
 using Jellyfin.Plugin.TranscodedDownloads.Enums;
+using Jellyfin.Plugin.TranscodedDownloads.Exceptions;
 
 namespace Jellyfin.Plugin.TranscodedDownloads.Services
 {
@@ -69,4 +70,3 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
         }
     }
 }
-```

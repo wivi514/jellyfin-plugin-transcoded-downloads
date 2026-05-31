@@ -36,4 +36,3 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Configuration
         public bool AskBeforeStartingLargeJobs { get; set; } = true;
     }
 }
-```

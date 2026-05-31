@@ -80,4 +80,3 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Configuration
         public List<UserDownloadPreference> UserPreferences { get; set; }
     }
 }
-```

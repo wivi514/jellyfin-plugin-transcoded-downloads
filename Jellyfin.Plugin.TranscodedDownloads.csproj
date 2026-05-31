@@ -8,8 +8,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Jellyfin.Plugin" Version="10.8.0" />
-    <PackageReference Include="Jellyfin.Api" Version="10.8.0" />
+    <PackageReference Include="Jellyfin.Controller" Version="10.8.0">
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </PackageReference>
+    <PackageReference Include="Jellyfin.Model" Version="10.8.0">
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Http" Version="6.0.0" />
   </ItemGroup>
 
@@ -20,4 +24,3 @@
   </ItemGroup>
 
 </Project>
-```

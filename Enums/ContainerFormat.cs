@@ -41,4 +41,3 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Enums
         Flac
     }
 }
-```

@@ -183,4 +183,3 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
         }
     }
 }
-``

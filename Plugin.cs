@@ -1,5 +1,5 @@
 using System;
-using System.IO;
+using MediaBrowser.Common.Configuration;
 using Jellyfin.Plugin.TranscodedDownloads.Configuration;
 using MediaBrowser.Common.Plugins;
 using MediaBrowser.Model.Plugins;
@@ -32,18 +32,10 @@ namespace Jellyfin.Plugin.TranscodedDownloads
         public override string Name => "Transcoded Downloads";
 
         /// <inheritdoc />
-        public override string Id => "Jellyfin-Plugin-TranscodedDownloads";
+        public override Guid Id => Guid.Parse("2dff9f1e-7a24-4c58-a1c8-74f4fd5312c8");
 
         /// <inheritdoc />
         public override string Description => "Download transcoded copies of movies, episodes, and music items directly from Jellyfin.";
 
-        /// <inheritdoc />
-        public override Version Version => new Version(1, 0, 0);
-
-        /// <summary>
-        /// Gets the plugin configuration.
-        /// </summary>
-        public PluginConfiguration Configuration => ConfigurationInstance;
     }
 }
-```

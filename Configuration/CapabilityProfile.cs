@@ -86,4 +86,3 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Configuration
         public string Notes { get; set; } = string.Empty;
     }
 }
-```

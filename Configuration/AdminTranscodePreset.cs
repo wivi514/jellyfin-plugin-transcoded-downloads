@@ -107,4 +107,3 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Configuration
         public bool IsAudioOnlyPreset { get; set; } = false;
     }
 }
-```

@@ -38,4 +38,3 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Enums
         Expired
     }
 }
-```
