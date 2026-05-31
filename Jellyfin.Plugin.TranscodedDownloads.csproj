@@ -23,4 +23,10 @@
     <EmbeddedResource Include="Web\injected-download-button.js" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Remove="tests\**\*.cs" />
+    <EmbeddedResource Remove="tests\**\*" />
+    <None Remove="tests\**\*" />
+  </ItemGroup>
+
 </Project>

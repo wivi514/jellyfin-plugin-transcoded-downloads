@@ -3,6 +3,10 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # 
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Jellyfin.Plugin.TranscodedDownloads", "Jellyfin.Plugin.TranscodedDownloads.csproj", "{49AA58D0-2E5C-4460-BA0C-79B2E0A14E2F}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{C0FC3750-D896-467E-B5D6-2C0301C7A11B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Jellyfin.Plugin.TranscodedDownloads.Tests", "tests\Jellyfin.Plugin.TranscodedDownloads.Tests\Jellyfin.Plugin.TranscodedDownloads.Tests.csproj", "{F18F508B-5F2D-4C2C-9403-7143C1A29FBF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -13,5 +17,12 @@ Global
 		{49AA58D0-2E5C-4460-BA0C-79B2E0A14E2F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{49AA58D0-2E5C-4460-BA0C-79B2E0A14E2F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{49AA58D0-2E5C-4460-BA0C-79B2E0A14E2F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F18F508B-5F2D-4C2C-9403-7143C1A29FBF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F18F508B-5F2D-4C2C-9403-7143C1A29FBF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F18F508B-5F2D-4C2C-9403-7143C1A29FBF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F18F508B-5F2D-4C2C-9403-7143C1A29FBF}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{F18F508B-5F2D-4C2C-9403-7143C1A29FBF} = {C0FC3750-D896-467E-B5D6-2C0301C7A11B}
 	EndGlobalSection
 EndGlobal

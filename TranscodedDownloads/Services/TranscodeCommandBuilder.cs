@@ -1,9 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using Jellyfin.Plugin.TranscodedDownloads.Configuration;
 using Jellyfin.Plugin.TranscodedDownloads.Enums;
+using Jellyfin.Plugin.TranscodedDownloads.Exceptions;
 
 namespace Jellyfin.Plugin.TranscodedDownloads.Services
 {
@@ -13,6 +12,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
     public sealed class TranscodeCommandBuilder : ITranscodeCommandBuilder
     {
         private readonly EncoderMap _encoderMap;
+        private readonly IPresetValidator _presetValidator;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="TranscodeCommandBuilder"/> class.
@@ -20,6 +20,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
         public TranscodeCommandBuilder()
         {
             _encoderMap = new EncoderMap();
+            _presetValidator = new PresetValidator();
         }
 
         /// <inheritdoc />
@@ -37,6 +38,13 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
                 throw new ArgumentException("Input path cannot be null or empty", nameof(inputPath));
             if (string.IsNullOrEmpty(outputPath))
                 throw new ArgumentException("Output path cannot be null or empty", nameof(outputPath));
+
+            var validationResult = _presetValidator.Validate(preset, new[] { capabilityProfile });
+            if (!validationResult.IsValid)
+            {
+                throw new UnsupportedCapabilityException(
+                    $"Preset '{preset.Id}' is not valid for capability profile '{capabilityProfile.Id}': {string.Join(" ", validationResult.Errors)}");
+            }
 
             var args = new List<string>
             {
