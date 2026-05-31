@@ -119,6 +119,76 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
         }
 
         [Fact]
+        public void GetJob_WhenJobExists_ReturnsJob()
+        {
+            var configuration = CreateConfiguration();
+            var service = new TranscodeJobService();
+            var createdJob = service.CreateJob(
+                new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" },
+                configuration);
+
+            var job = service.GetJob(createdJob.Id);
+
+            Assert.NotNull(job);
+            Assert.Equal(createdJob.Id, job.Id);
+        }
+
+        [Fact]
+        public void GetJob_WhenJobDoesNotExist_ReturnsNull()
+        {
+            var service = new TranscodeJobService();
+
+            var job = service.GetJob(Guid.NewGuid());
+
+            Assert.Null(job);
+        }
+
+        [Fact]
+        public void DeleteJob_WhenQueuedJobExists_RemovesJob()
+        {
+            var configuration = CreateConfiguration();
+            var service = new TranscodeJobService();
+            var createdJob = service.CreateJob(
+                new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" },
+                configuration);
+
+            var deleted = service.DeleteJob(createdJob.Id);
+
+            Assert.True(deleted);
+            Assert.Null(service.GetJob(createdJob.Id));
+            Assert.Empty(service.GetJobs());
+        }
+
+        [Fact]
+        public void DeleteJob_WhenJobDoesNotExist_ReturnsFalse()
+        {
+            var service = new TranscodeJobService();
+
+            var deleted = service.DeleteJob(Guid.NewGuid());
+
+            Assert.False(deleted);
+        }
+
+        [Fact]
+        public void DeleteJob_WhenRunningJobExists_MarksJobCancelled()
+        {
+            var configuration = CreateConfiguration();
+            var service = new TranscodeJobService();
+            var createdJob = service.CreateJob(
+                new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" },
+                configuration);
+            service.TryUpdateJobStatus(createdJob.Id, JobStatus.Running);
+
+            var deleted = service.DeleteJob(createdJob.Id);
+            var job = service.GetJob(createdJob.Id);
+
+            Assert.True(deleted);
+            Assert.NotNull(job);
+            Assert.Equal(JobStatus.Cancelled, job.Status);
+            Assert.NotNull(job.CompletedAt);
+        }
+
+        [Fact]
         public void CreateJob_WhenItemIdIsEmpty_ThrowsArgumentException()
         {
             var configuration = CreateConfiguration();

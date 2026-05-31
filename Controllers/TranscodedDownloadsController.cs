@@ -95,5 +95,38 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Controllers
         {
             return Ok(_transcodeJobService.GetJobs());
         }
+
+        /// <summary>
+        /// Gets a transcoded download job by ID.
+        /// </summary>
+        /// <param name="jobId">The job ID.</param>
+        /// <returns>The job.</returns>
+        [HttpGet("Jobs/{jobId}")]
+        public ActionResult<DownloadJobDto> GetJob(Guid jobId)
+        {
+            var job = _transcodeJobService.GetJob(jobId);
+            if (job == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(job);
+        }
+
+        /// <summary>
+        /// Deletes or cancels a transcoded download job.
+        /// </summary>
+        /// <param name="jobId">The job ID.</param>
+        /// <returns>No content when the job was found.</returns>
+        [HttpDelete("Jobs/{jobId}")]
+        public IActionResult DeleteJob(Guid jobId)
+        {
+            if (!_transcodeJobService.DeleteJob(jobId))
+            {
+                return NotFound();
+            }
+
+            return NoContent();
+        }
     }
 }

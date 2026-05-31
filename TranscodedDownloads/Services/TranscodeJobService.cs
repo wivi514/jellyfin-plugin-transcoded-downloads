@@ -107,6 +107,65 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
             }
         }
 
+        /// <inheritdoc />
+        public DownloadJobDto? GetJob(Guid jobId)
+        {
+            lock (_syncRoot)
+            {
+                var job = _jobs.FirstOrDefault(candidate => candidate.Id == jobId);
+                return job == null ? null : Clone(job);
+            }
+        }
+
+        /// <inheritdoc />
+        public bool DeleteJob(Guid jobId)
+        {
+            lock (_syncRoot)
+            {
+                var job = _jobs.FirstOrDefault(candidate => candidate.Id == jobId);
+                if (job == null)
+                {
+                    return false;
+                }
+
+                if (job.Status == JobStatus.Queued)
+                {
+                    _jobs.Remove(job);
+                }
+                else if (job.Status == JobStatus.Running)
+                {
+                    job.Status = JobStatus.Cancelled;
+                    job.CompletedAt = DateTimeOffset.UtcNow;
+                }
+
+                return true;
+            }
+        }
+
+        internal bool TryUpdateJobStatus(Guid jobId, JobStatus status)
+        {
+            lock (_syncRoot)
+            {
+                var job = _jobs.FirstOrDefault(candidate => candidate.Id == jobId);
+                if (job == null)
+                {
+                    return false;
+                }
+
+                job.Status = status;
+                if (status == JobStatus.Running)
+                {
+                    job.StartedAt = DateTimeOffset.UtcNow;
+                }
+                else if (status == JobStatus.Completed || status == JobStatus.Failed || status == JobStatus.Cancelled)
+                {
+                    job.CompletedAt = DateTimeOffset.UtcNow;
+                }
+
+                return true;
+            }
+        }
+
         private static DownloadJobDto Clone(DownloadJobDto job)
         {
             return new DownloadJobDto

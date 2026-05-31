@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System;
 using Jellyfin.Plugin.TranscodedDownloads.Configuration;
 using Jellyfin.Plugin.TranscodedDownloads.Models;
 
@@ -22,5 +23,19 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
         /// </summary>
         /// <returns>The known jobs.</returns>
         IReadOnlyList<DownloadJobDto> GetJobs();
+
+        /// <summary>
+        /// Gets a single job by ID.
+        /// </summary>
+        /// <param name="jobId">The job ID.</param>
+        /// <returns>The job, or null when it does not exist.</returns>
+        DownloadJobDto? GetJob(Guid jobId);
+
+        /// <summary>
+        /// Deletes or cancels a job by ID.
+        /// </summary>
+        /// <param name="jobId">The job ID.</param>
+        /// <returns>True when the job exists; otherwise, false.</returns>
+        bool DeleteJob(Guid jobId);
     }
 }
