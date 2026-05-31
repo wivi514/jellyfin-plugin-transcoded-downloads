@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Jellyfin.Plugin.TranscodedDownloads.Configuration;
 using Jellyfin.Plugin.TranscodedDownloads.Enums;
@@ -10,13 +11,28 @@ using Xunit;
 
 namespace Jellyfin.Plugin.TranscodedDownloads.Tests
 {
-    public sealed class TranscodeJobServiceTests
+    public sealed class TranscodeJobServiceTests : IDisposable
     {
+        private readonly string _tempRoot;
+
+        public TranscodeJobServiceTests()
+        {
+            _tempRoot = Path.Combine(Path.GetTempPath(), "jellyfin-transcode-job-service-tests", Guid.NewGuid().ToString("N"));
+        }
+
+        public void Dispose()
+        {
+            if (Directory.Exists(_tempRoot))
+            {
+                Directory.Delete(_tempRoot, recursive: true);
+            }
+        }
+
         [Fact]
         public void CreateJob_WithValidPreset_CreatesQueuedJob()
         {
             var configuration = CreateConfiguration();
-            var service = new TranscodeJobService();
+            var service = CreateService();
             var request = new CreateDownloadJobRequest
             {
                 ItemId = Guid.NewGuid(),
@@ -32,6 +48,12 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
             Assert.Equal("video-preset", job.PresetId);
             Assert.Equal(JobStatus.Queued, job.Status);
             Assert.Equal(0, job.ProgressPercent);
+            Assert.NotNull(job.OutputFileName);
+            Assert.NotNull(job.OutputPath);
+            Assert.NotNull(job.TempDirectory);
+            Assert.EndsWith(".mp4", job.OutputFileName, StringComparison.Ordinal);
+            Assert.True(Directory.Exists(job.TempDirectory));
+            Assert.StartsWith(job.TempDirectory, job.OutputPath, StringComparison.Ordinal);
             Assert.True(job.CreatedAt <= DateTimeOffset.UtcNow);
             Assert.Null(job.StartedAt);
             Assert.Null(job.CompletedAt);
@@ -41,7 +63,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
         public void CreateJob_WhenPresetDoesNotExist_ThrowsInvalidPresetException()
         {
             var configuration = CreateConfiguration();
-            var service = new TranscodeJobService();
+            var service = CreateService();
             var request = new CreateDownloadJobRequest
             {
                 ItemId = Guid.NewGuid(),
@@ -56,7 +78,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
         {
             var configuration = CreateConfiguration();
             configuration.Presets[0].VideoCodec = VideoCodec.H265;
-            var service = new TranscodeJobService();
+            var service = CreateService();
             var request = new CreateDownloadJobRequest
             {
                 ItemId = Guid.NewGuid(),
@@ -71,7 +93,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
         {
             var configuration = CreateConfiguration();
             configuration.MaxQueueSize = 1;
-            var service = new TranscodeJobService();
+            var service = CreateService();
 
             service.CreateJob(
                 new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" },
@@ -81,13 +103,14 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
                 () => service.CreateJob(
                     new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" },
                     configuration));
+            Assert.Single(Directory.GetDirectories(_tempRoot));
         }
 
         [Fact]
         public void GetJobs_ReturnsCreatedJobs()
         {
             var configuration = CreateConfiguration();
-            var service = new TranscodeJobService();
+            var service = CreateService();
             var firstRequest = new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" };
             var secondRequest = new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" };
 
@@ -105,7 +128,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
         public void GetJobs_ReturnsClonedJobs()
         {
             var configuration = CreateConfiguration();
-            var service = new TranscodeJobService();
+            var service = CreateService();
             var createdJob = service.CreateJob(
                 new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" },
                 configuration);
@@ -122,7 +145,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
         public void GetJob_WhenJobExists_ReturnsJob()
         {
             var configuration = CreateConfiguration();
-            var service = new TranscodeJobService();
+            var service = CreateService();
             var createdJob = service.CreateJob(
                 new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" },
                 configuration);
@@ -136,7 +159,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
         [Fact]
         public void GetJob_WhenJobDoesNotExist_ReturnsNull()
         {
-            var service = new TranscodeJobService();
+            var service = CreateService();
 
             var job = service.GetJob(Guid.NewGuid());
 
@@ -147,22 +170,25 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
         public void DeleteJob_WhenQueuedJobExists_RemovesJob()
         {
             var configuration = CreateConfiguration();
-            var service = new TranscodeJobService();
+            var service = CreateService();
             var createdJob = service.CreateJob(
                 new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" },
                 configuration);
+            var tempDirectory = createdJob.TempDirectory;
 
             var deleted = service.DeleteJob(createdJob.Id);
 
             Assert.True(deleted);
             Assert.Null(service.GetJob(createdJob.Id));
             Assert.Empty(service.GetJobs());
+            Assert.NotNull(tempDirectory);
+            Assert.False(Directory.Exists(tempDirectory));
         }
 
         [Fact]
         public void DeleteJob_WhenJobDoesNotExist_ReturnsFalse()
         {
-            var service = new TranscodeJobService();
+            var service = CreateService();
 
             var deleted = service.DeleteJob(Guid.NewGuid());
 
@@ -173,7 +199,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
         public void DeleteJob_WhenRunningJobExists_MarksJobCancelled()
         {
             var configuration = CreateConfiguration();
-            var service = new TranscodeJobService();
+            var service = CreateService();
             var createdJob = service.CreateJob(
                 new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" },
                 configuration);
@@ -192,7 +218,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
         public void CreateJob_WhenItemIdIsEmpty_ThrowsArgumentException()
         {
             var configuration = CreateConfiguration();
-            var service = new TranscodeJobService();
+            var service = CreateService();
             var request = new CreateDownloadJobRequest
             {
                 ItemId = Guid.Empty,
@@ -200,6 +226,11 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
             };
 
             Assert.Throws<ArgumentException>(() => service.CreateJob(request, configuration));
+        }
+
+        private TranscodeJobService CreateService()
+        {
+            return new TranscodeJobService(new PresetValidator(), new TempFileStore(_tempRoot));
         }
 
         private static PluginConfiguration CreateConfiguration()

@@ -16,6 +16,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
         private readonly object _syncRoot = new object();
         private readonly List<DownloadJobDto> _jobs = new List<DownloadJobDto>();
         private readonly IPresetValidator _presetValidator;
+        private readonly ITempFileStore _tempFileStore;
 
         /// <summary>
         /// Initializes the shared job service instance used by the controller until DI is wired.
@@ -26,7 +27,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
         /// Initializes a new instance of the <see cref="TranscodeJobService"/> class.
         /// </summary>
         public TranscodeJobService()
-            : this(new PresetValidator())
+            : this(new PresetValidator(), new TempFileStore())
         {
         }
 
@@ -35,8 +36,19 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
         /// </summary>
         /// <param name="presetValidator">The preset validator.</param>
         public TranscodeJobService(IPresetValidator presetValidator)
+            : this(presetValidator, new TempFileStore())
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TranscodeJobService"/> class.
+        /// </summary>
+        /// <param name="presetValidator">The preset validator.</param>
+        /// <param name="tempFileStore">The temp file store.</param>
+        public TranscodeJobService(IPresetValidator presetValidator, ITempFileStore tempFileStore)
         {
             _presetValidator = presetValidator ?? throw new ArgumentNullException(nameof(presetValidator));
+            _tempFileStore = tempFileStore ?? throw new ArgumentNullException(nameof(tempFileStore));
         }
 
         /// <inheritdoc />
@@ -82,14 +94,24 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
                     throw new TranscodeQueueFullException("The transcode download queue is full.");
                 }
 
+                var jobId = Guid.NewGuid();
+                var reservation = _tempFileStore.ReserveOutputFile(
+                    configuration,
+                    jobId,
+                    request.ItemId.ToString("N"),
+                    preset);
+
                 var job = new DownloadJobDto
                 {
-                    Id = Guid.NewGuid(),
+                    Id = jobId,
                     ItemId = request.ItemId,
                     UserId = Guid.Empty,
                     PresetId = preset.Id,
                     Status = JobStatus.Queued,
                     ProgressPercent = 0,
+                    OutputFileName = reservation.OutputFileName,
+                    OutputPath = reservation.OutputPath,
+                    TempDirectory = reservation.JobDirectory,
                     CreatedAt = DateTimeOffset.UtcNow
                 };
 
@@ -131,6 +153,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
                 if (job.Status == JobStatus.Queued)
                 {
                     _jobs.Remove(job);
+                    _tempFileStore.DeleteJobDirectory(new PluginConfiguration { TempDirectory = GetTempRoot(job) }, job.Id);
                 }
                 else if (job.Status == JobStatus.Running)
                 {
@@ -177,12 +200,24 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
                 Status = job.Status,
                 ProgressPercent = job.ProgressPercent,
                 OutputFileName = job.OutputFileName,
+                OutputPath = job.OutputPath,
+                TempDirectory = job.TempDirectory,
                 OutputSizeBytes = job.OutputSizeBytes,
                 ErrorMessage = job.ErrorMessage,
                 CreatedAt = job.CreatedAt,
                 StartedAt = job.StartedAt,
                 CompletedAt = job.CompletedAt
             };
+        }
+
+        private static string GetTempRoot(DownloadJobDto job)
+        {
+            if (string.IsNullOrWhiteSpace(job.TempDirectory))
+            {
+                return string.Empty;
+            }
+
+            return System.IO.Directory.GetParent(job.TempDirectory)?.FullName ?? string.Empty;
         }
     }
 }

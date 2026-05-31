@@ -1,4 +1,5 @@
 using System;
+using System.Text.Json.Serialization;
 using Jellyfin.Plugin.TranscodedDownloads.Enums;
 
 namespace Jellyfin.Plugin.TranscodedDownloads.Models
@@ -42,6 +43,18 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Models
         /// Gets or sets the completed output file name.
         /// </summary>
         public string? OutputFileName { get; set; }
+
+        /// <summary>
+        /// Gets or sets the internal temporary output file path.
+        /// </summary>
+        [JsonIgnore]
+        public string? OutputPath { get; set; }
+
+        /// <summary>
+        /// Gets or sets the internal temporary job directory.
+        /// </summary>
+        [JsonIgnore]
+        public string? TempDirectory { get; set; }
 
         /// <summary>
         /// Gets or sets the completed output size in bytes.
