@@ -2,11 +2,11 @@
 set -euo pipefail
 
 configuration="${CONFIGURATION:-Release}"
-version="${VERSION:-0.1.0.0}"
+version="${VERSION:-0.2.0.0}"
 project="Jellyfin.Plugin.TranscodedDownloads.csproj"
 plugin_name="Jellyfin.Plugin.TranscodedDownloads"
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-publish_dir="${repo_root}/bin/${configuration}/net6.0/publish"
+publish_dir="${repo_root}/bin/${configuration}/net9.0/publish"
 dist_dir="${repo_root}/dist"
 package_path="${dist_dir}/${plugin_name}_${version}.zip"
 
@@ -20,8 +20,7 @@ rm -f "${package_path}"
     cd "${publish_dir}"
     zip -9 -q "${package_path}" \
         "${plugin_name}.dll" \
-        "${plugin_name}.pdb" \
-        "Microsoft.Extensions.Logging.Abstractions.dll"
+        "${plugin_name}.pdb"
 )
 
 checksum="$(md5sum "${package_path}" | awk '{print toupper($1)}')"

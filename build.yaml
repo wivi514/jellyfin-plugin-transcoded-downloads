@@ -1,9 +1,9 @@
 ---
 name: "Transcoded Downloads"
 guid: "2dff9f1e-7a24-4c58-a1c8-74f4fd5312c8"
-version: "0.1.0.0"
-targetAbi: "10.8.0.0"
-framework: "net6.0"
+version: "0.2.0.0"
+targetAbi: "10.11.0.0"
+framework: "net9.0"
 overview: "Download transcoded copies of Jellyfin media."
 description: >
   Adds Jellyfin API and Web UI support for downloading transcoded copies of
@@ -13,8 +13,5 @@ owner: "wivi514"
 artifacts:
   - "Jellyfin.Plugin.TranscodedDownloads.dll"
   - "Jellyfin.Plugin.TranscodedDownloads.pdb"
-  - "Microsoft.Extensions.Logging.Abstractions.dll"
 changelog: >
-  Initial development release with preset listing, transcode job creation,
-  background job startup, completed file downloads, and a Jellyfin Web item
-  action for starting transcoded downloads.
+  Updated the plugin target to Jellyfin 10.11 and .NET 9 packages.

@@ -2,7 +2,6 @@ using System;
 using Jellyfin.Plugin.TranscodedDownloads.Exceptions;
 using Jellyfin.Plugin.TranscodedDownloads.Models;
 using MediaBrowser.Controller.Library;
-using MediaBrowser.Model.Entities;
 
 namespace Jellyfin.Plugin.TranscodedDownloads.Services
 {
@@ -46,8 +45,8 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
                 ItemId = item.Id,
                 Name = string.IsNullOrWhiteSpace(item.Name) ? item.Id.ToString("N") : item.Name,
                 Path = item.Path,
-                IsVideo = string.Equals(item.MediaType, MediaType.Video, StringComparison.OrdinalIgnoreCase),
-                IsAudio = string.Equals(item.MediaType, MediaType.Audio, StringComparison.OrdinalIgnoreCase)
+                IsVideo = item.MediaType == Jellyfin.Data.Enums.MediaType.Video,
+                IsAudio = item.MediaType == Jellyfin.Data.Enums.MediaType.Audio
             };
         }
     }
