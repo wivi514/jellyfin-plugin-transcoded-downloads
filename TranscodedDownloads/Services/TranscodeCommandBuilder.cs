@@ -58,9 +58,8 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
             AddVideoEncoding(args, preset, capabilityProfile);
             AddAudioEncoding(args, preset, capabilityProfile);
             AddContainerSettings(args, preset);
-            AddSubtitleSettings(args, preset, capabilityProfile);
-            AddToneMapping(args, preset, capabilityProfile);
-            AddScaling(args, preset);
+            AddSubtitleSelection(args, preset);
+            AddVideoFilters(args, preset, capabilityProfile);
             AddBitrateSettings(args, preset);
 
             args.Add(outputPath);
@@ -90,23 +89,6 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
             var videoEncoder = _encoderMap.ResolveVideoEncoder(capabilityProfile.Backend, preset.VideoCodec);
             args.Add("-c:v");
             args.Add(videoEncoder);
-
-            // Add hardware acceleration flags if needed
-            if (capabilityProfile.Backend == TranscodeBackend.Vaapi)
-            {
-                args.Add("-filter:v");
-                args.Add("format=nv12|vaapi");
-            }
-            else if (capabilityProfile.Backend == TranscodeBackend.Qsv)
-            {
-                args.Add("-filter:v");
-                args.Add("format=nv12|qsv");
-            }
-            else if (capabilityProfile.Backend == TranscodeBackend.Nvenc)
-            {
-                args.Add("-filter:v");
-                args.Add("format=nv12|cuda");
-            }
         }
 
         private void AddAudioEncoding(List<string> args, AdminTranscodePreset preset, CapabilityProfile capabilityProfile)
@@ -130,42 +112,62 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
             // The output path extension determines the container
         }
 
-        private void AddSubtitleSettings(List<string> args, AdminTranscodePreset preset, CapabilityProfile capabilityProfile)
+        private void AddSubtitleSelection(List<string> args, AdminTranscodePreset preset)
         {
+            if (!preset.BurnSubtitles)
+            {
+                args.Add("-sn");
+            }
+        }
+
+        private void AddVideoFilters(List<string> args, AdminTranscodePreset preset, CapabilityProfile capabilityProfile)
+        {
+            if (preset.IsAudioOnlyPreset)
+            {
+                return;
+            }
+
+            var filters = new List<string>();
+
+            AddHardwareFormatFilter(filters, capabilityProfile);
+
             if (preset.BurnSubtitles)
             {
-                if (capabilityProfile.SupportsSubtitleBurnIn)
-                {
-                    args.Add("-vf");
-                    args.Add("subtitles");
-                }
-                else
-                {
-                    // If burn-in is not supported, we can't burn subtitles
-                    // This should be handled by validation before calling this method
-                }
+                filters.Add("subtitles");
             }
-            else
-            {
-                args.Add("-sn"); // Disable subtitles
-            }
-        }
 
-        private void AddToneMapping(List<string> args, AdminTranscodePreset preset, CapabilityProfile capabilityProfile)
-        {
             if (preset.ToneMapHdrToSdr && capabilityProfile.SupportsToneMapping)
             {
-                args.Add("-vf");
-                args.Add("tonemap=hable");
+                filters.Add("tonemap=hable");
             }
-        }
 
-        private void AddScaling(List<string> args, AdminTranscodePreset preset)
-        {
             if (preset.MaxWidth.HasValue && preset.MaxHeight.HasValue)
             {
-                args.Add("-vf");
-                args.Add($"scale={preset.MaxWidth}:{preset.MaxHeight}");
+                filters.Add($"scale={preset.MaxWidth}:{preset.MaxHeight}");
+            }
+
+            if (filters.Count == 0)
+            {
+                return;
+            }
+
+            args.Add("-filter:v");
+            args.Add(string.Join(",", filters));
+        }
+
+        private static void AddHardwareFormatFilter(List<string> filters, CapabilityProfile capabilityProfile)
+        {
+            var filter = capabilityProfile.Backend switch
+            {
+                TranscodeBackend.Vaapi => "format=nv12|vaapi",
+                TranscodeBackend.Qsv => "format=nv12|qsv",
+                TranscodeBackend.Nvenc => "format=nv12|cuda",
+                _ => null
+            };
+
+            if (!string.IsNullOrWhiteSpace(filter))
+            {
+                filters.Add(filter);
             }
         }
 
