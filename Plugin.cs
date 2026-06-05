@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using MediaBrowser.Common.Configuration;
 using Jellyfin.Plugin.TranscodedDownloads.Configuration;
 using MediaBrowser.Common.Plugins;
@@ -10,7 +11,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads
     /// <summary>
     /// The main plugin class for the Transcoded Downloads plugin.
     /// </summary>
-    public sealed class Plugin : BasePlugin<PluginConfiguration>
+    public sealed class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="Plugin"/> class.
@@ -37,5 +38,28 @@ namespace Jellyfin.Plugin.TranscodedDownloads
         /// <inheritdoc />
         public override string Description => "Download transcoded copies of movies, episodes, and music items directly from Jellyfin.";
 
+        /// <inheritdoc />
+        public IEnumerable<PluginPageInfo> GetPages()
+        {
+            return new[]
+            {
+                new PluginPageInfo
+                {
+                    Name = "transcodeddownloads",
+                    DisplayName = Name,
+                    EmbeddedResourcePath = GetType().Namespace + ".Pages.configPage.html"
+                },
+                new PluginPageInfo
+                {
+                    Name = "transcodeddownloadsjs",
+                    EmbeddedResourcePath = GetType().Namespace + ".Pages.configPage.js"
+                },
+                new PluginPageInfo
+                {
+                    Name = "transcodeddownloadsbuttonjs",
+                    EmbeddedResourcePath = GetType().Namespace + ".Web.injected-download-button.js"
+                }
+            };
+        }
     }
 }
