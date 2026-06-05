@@ -19,7 +19,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
         /// Initializes a new instance of the <see cref="TranscodeProcessRunner"/> class.
         /// </summary>
         public TranscodeProcessRunner()
-            : this(new TranscodeCommandBuilder(), "ffmpeg")
+            : this(new TranscodeCommandBuilder(), ResolveDefaultFfmpegPath(Environment.GetEnvironmentVariable("JELLYFIN_FFMPEG")))
         {
         }
 
@@ -101,6 +101,11 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
             catch (InvalidOperationException)
             {
             }
+        }
+
+        internal static string ResolveDefaultFfmpegPath(string? environmentPath)
+        {
+            return string.IsNullOrWhiteSpace(environmentPath) ? "ffmpeg" : environmentPath;
         }
 
         private static string SummarizeError(string stderr)
