@@ -117,7 +117,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
         }
 
         [Fact]
-        public async Task StartJobAsync_WhenResolvedItemHasNoPath_ThrowsMediaItemResolutionException()
+        public async Task StartJobAsync_WhenResolvedItemHasNoPath_MarksJobFailed()
         {
             var configuration = CreateConfiguration();
             var service = CreateService();
@@ -132,8 +132,13 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
                 IsVideo = true
             };
 
-            await Assert.ThrowsAsync<MediaItemResolutionException>(
-                () => service.StartJobAsync(createdJob.Id, configuration, CancellationToken.None));
+            var started = await service.StartJobAsync(createdJob.Id, configuration, CancellationToken.None);
+            var job = service.GetJob(createdJob.Id);
+
+            Assert.True(started);
+            Assert.NotNull(job);
+            Assert.Equal(JobStatus.Failed, job.Status);
+            Assert.Equal("The requested media item does not have a source path.", job.ErrorMessage);
             Assert.False(_processRunner.WasCalled);
         }
 

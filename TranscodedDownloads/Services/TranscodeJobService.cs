@@ -220,12 +220,20 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
                     return true;
                 }
 
-                preset = configuration.Presets.FirstOrDefault(candidate => candidate.Id == job.PresetId)
-                    ?? throw new InvalidPresetException("The requested preset does not exist.");
-                capabilityProfile = configuration.CapabilityProfiles.FirstOrDefault(candidate => candidate.Id == preset.CapabilityProfileId)
-                    ?? throw new InvalidPresetException("The requested preset does not reference a configured capability profile.");
-                mediaItem = _mediaItemResolver.ResolveItem(job.ItemId);
-                ValidatePresetMatchesMediaType(preset, mediaItem);
+                try
+                {
+                    preset = configuration.Presets.FirstOrDefault(candidate => candidate.Id == job.PresetId)
+                        ?? throw new InvalidPresetException("The requested preset does not exist.");
+                    capabilityProfile = configuration.CapabilityProfiles.FirstOrDefault(candidate => candidate.Id == preset.CapabilityProfileId)
+                        ?? throw new InvalidPresetException("The requested preset does not reference a configured capability profile.");
+                    mediaItem = _mediaItemResolver.ResolveItem(job.ItemId);
+                    ValidatePresetMatchesMediaType(preset, mediaItem);
+                }
+                catch (Exception ex) when (ex is InvalidPresetException || ex is MediaItemResolutionException || ex is ArgumentException)
+                {
+                    MarkJobFailed(job, ex.Message);
+                    return true;
+                }
 
                 job.Status = JobStatus.Running;
                 job.StartedAt = DateTimeOffset.UtcNow;
@@ -233,12 +241,43 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
                 jobSnapshot = Clone(job);
             }
 
-            var result = await _processRunner.RunAsync(
-                preset,
-                capabilityProfile,
-                mediaItem.Path,
-                jobSnapshot.OutputPath!,
-                cancellationToken).ConfigureAwait(false);
+            TranscodeProcessResult result;
+            try
+            {
+                result = await _processRunner.RunAsync(
+                    preset,
+                    capabilityProfile,
+                    mediaItem.Path,
+                    jobSnapshot.OutputPath!,
+                    cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                lock (_syncRoot)
+                {
+                    var job = _jobs.FirstOrDefault(candidate => candidate.Id == jobId);
+                    if (job != null && job.Status == JobStatus.Running)
+                    {
+                        job.Status = JobStatus.Cancelled;
+                        job.CompletedAt = DateTimeOffset.UtcNow;
+                    }
+
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                lock (_syncRoot)
+                {
+                    var job = _jobs.FirstOrDefault(candidate => candidate.Id == jobId);
+                    if (job != null && job.Status == JobStatus.Running)
+                    {
+                        MarkJobFailed(job, ex.Message);
+                    }
+
+                    return true;
+                }
+            }
 
             lock (_syncRoot)
             {

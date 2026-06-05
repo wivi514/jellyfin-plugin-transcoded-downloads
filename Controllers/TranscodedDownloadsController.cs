@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using Jellyfin.Plugin.TranscodedDownloads.Configuration;
 using Jellyfin.Plugin.TranscodedDownloads.Enums;
 using Jellyfin.Plugin.TranscodedDownloads.Exceptions;
 using Jellyfin.Plugin.TranscodedDownloads.Models;
 using Jellyfin.Plugin.TranscodedDownloads.Services;
+using MediaBrowser.Controller.Library;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Jellyfin.Plugin.TranscodedDownloads.Controllers
@@ -15,8 +17,13 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Controllers
     [Route("TranscodedDownloads")]
     public sealed class TranscodedDownloadsController : ControllerBase
     {
+        private static readonly object RuntimeJobServiceSyncRoot = new object();
+        private static ITranscodeJobService? _runtimeJobService;
+
         private readonly IPresetListingService _presetListingService;
         private readonly ITranscodeJobService _transcodeJobService;
+        private readonly ITranscodeJobStarter _transcodeJobStarter;
+        private readonly Func<PluginConfiguration?> _configurationProvider;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="TranscodedDownloadsController"/> class.
@@ -29,14 +36,38 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Controllers
         /// <summary>
         /// Initializes a new instance of the <see cref="TranscodedDownloadsController"/> class.
         /// </summary>
+        /// <param name="libraryManager">The Jellyfin library manager.</param>
+        public TranscodedDownloadsController(ILibraryManager libraryManager)
+            : this(new PresetListingService(), CreateRuntimeJobService(libraryManager))
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TranscodedDownloadsController"/> class.
+        /// </summary>
         /// <param name="presetListingService">The preset listing service.</param>
         /// <param name="transcodeJobService">The transcode job service.</param>
         public TranscodedDownloadsController(
             IPresetListingService presetListingService,
             ITranscodeJobService transcodeJobService)
+            : this(
+                presetListingService,
+                transcodeJobService,
+                new BackgroundTranscodeJobStarter(transcodeJobService),
+                () => Plugin.Instance?.Configuration)
+        {
+        }
+
+        internal TranscodedDownloadsController(
+            IPresetListingService presetListingService,
+            ITranscodeJobService transcodeJobService,
+            ITranscodeJobStarter transcodeJobStarter,
+            Func<PluginConfiguration?> configurationProvider)
         {
             _presetListingService = presetListingService ?? throw new ArgumentNullException(nameof(presetListingService));
             _transcodeJobService = transcodeJobService ?? throw new ArgumentNullException(nameof(transcodeJobService));
+            _transcodeJobStarter = transcodeJobStarter ?? throw new ArgumentNullException(nameof(transcodeJobStarter));
+            _configurationProvider = configurationProvider ?? throw new ArgumentNullException(nameof(configurationProvider));
         }
 
         /// <summary>
@@ -46,13 +77,13 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Controllers
         [HttpGet("Presets")]
         public ActionResult<IReadOnlyList<TranscodePresetDto>> GetPresets()
         {
-            var plugin = Plugin.Instance;
-            if (plugin == null)
+            var configuration = _configurationProvider();
+            if (configuration == null)
             {
                 return StatusCode(503);
             }
 
-            return Ok(_presetListingService.GetAvailablePresets(plugin.Configuration));
+            return Ok(_presetListingService.GetAvailablePresets(configuration));
         }
 
         /// <summary>
@@ -63,15 +94,21 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Controllers
         [HttpPost("Jobs")]
         public ActionResult<DownloadJobDto> CreateJob(CreateDownloadJobRequest request)
         {
-            var plugin = Plugin.Instance;
-            if (plugin == null)
+            var configuration = _configurationProvider();
+            if (configuration == null)
             {
                 return StatusCode(503);
             }
 
             try
             {
-                return Ok(_transcodeJobService.CreateJob(request, plugin.Configuration));
+                var job = _transcodeJobService.CreateJob(request, configuration);
+                if (request.StartImmediately)
+                {
+                    _transcodeJobStarter.StartJob(job.Id, configuration);
+                }
+
+                return Ok(job);
             }
             catch (InvalidPresetException ex)
             {
@@ -151,6 +188,20 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Controllers
                 CompletedJobFileStatus.Available => PhysicalFile(file.Path!, file.ContentType!, file.DownloadFileName),
                 _ => StatusCode(500)
             };
+        }
+
+        private static ITranscodeJobService CreateRuntimeJobService(ILibraryManager libraryManager)
+        {
+            lock (RuntimeJobServiceSyncRoot)
+            {
+                _runtimeJobService ??= new TranscodeJobService(
+                    new PresetValidator(),
+                    new TempFileStore(),
+                    new TranscodeProcessRunner(),
+                    new MediaItemResolver(libraryManager));
+
+                return _runtimeJobService;
+            }
         }
     }
 }
