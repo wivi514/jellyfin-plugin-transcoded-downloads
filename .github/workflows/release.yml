@@ -1,0 +1,75 @@
+name: Release Plugin
+
+on:
+  push:
+    tags:
+      - "v*.*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Plugin version to release, without the leading v"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish release package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            version="${{ inputs.version }}"
+          else
+            version="${GITHUB_REF_NAME#v}"
+          fi
+
+          printf 'version=%s\n' "${version}" >>"${GITHUB_OUTPUT}"
+          printf 'tag=v%s\n' "${version}" >>"${GITHUB_OUTPUT}"
+
+      - name: Run tests
+        run: dotnet test Jellyfin_Transcode_Download.sln
+
+      - name: Build package
+        run: scripts/package-plugin.sh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+
+      - name: Validate repository manifest
+        run: scripts/validate-plugin-repository.sh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+
+      - name: Publish GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          package_path="dist/Jellyfin.Plugin.TranscodedDownloads_${VERSION}.zip"
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release upload "${TAG}" "${package_path}" --clobber
+          else
+            gh release create "${TAG}" "${package_path}" \
+              --title "${TAG}" \
+              --notes "Jellyfin Transcoded Downloads ${VERSION}"
+          fi

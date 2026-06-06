@@ -9,16 +9,20 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 publish_dir="${repo_root}/bin/${configuration}/net9.0/publish"
 dist_dir="${repo_root}/dist"
 package_path="${dist_dir}/${plugin_name}_${version}.zip"
+artifact_timestamp="${PACKAGE_TIMESTAMP:-2026-06-05 00:00:00 UTC}"
 
 rm -rf "${publish_dir}"
 dotnet publish "${repo_root}/${project}" -c "${configuration}" -o "${publish_dir}"
 
 mkdir -p "${dist_dir}"
 rm -f "${package_path}"
+touch -d "${artifact_timestamp}" \
+    "${publish_dir}/${plugin_name}.dll" \
+    "${publish_dir}/${plugin_name}.pdb"
 
 (
     cd "${publish_dir}"
-    zip -9 -q "${package_path}" \
+    zip -X -9 -q "${package_path}" \
         "${plugin_name}.dll" \
         "${plugin_name}.pdb"
 )

@@ -24,6 +24,24 @@ This plugin adds a Jellyfin API and web configuration page for creating download
 
 ## Install
 
+### Jellyfin Plugin Repository
+
+Add this repository URL in Jellyfin:
+
+```text
+https://raw.githubusercontent.com/wivi514/jellyfin-plugin-transcoded-downloads/master/manifest.json
+```
+
+In Jellyfin, go to Dashboard -> Plugins -> Repositories, add the URL above, then open Catalog and install `Transcoded Downloads`.
+
+The repository manifest points to the matching GitHub Releases package for the advertised version. For version `0.2.0.0`, the release asset must exist at:
+
+```text
+https://github.com/wivi514/jellyfin-plugin-transcoded-downloads/releases/download/v0.2.0.0/Jellyfin.Plugin.TranscodedDownloads_0.2.0.0.zip
+```
+
+### Manual Install
+
 Build the plugin package:
 
 ```bash
@@ -121,3 +139,18 @@ scripts/package-plugin.sh
 ```
 
 The script prints the MD5 to copy into `manifest.json`.
+
+Validate the local package against the Jellyfin repository manifest:
+
+```bash
+scripts/validate-plugin-repository.sh
+```
+
+To publish an installable release, commit the matching `manifest.json`, then push a version tag:
+
+```bash
+git tag v0.2.0.0
+git push origin master v0.2.0.0
+```
+
+The GitHub Actions release workflow builds the package, validates the manifest, and uploads the zip to the release URL used by Jellyfin.
