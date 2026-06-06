@@ -240,7 +240,7 @@ XML
 start_server running
 
 presets="$(curl -fsS "${base_url}/TranscodedDownloads/Presets" -H "X-Emby-Token: ${token}")"
-if [[ "$(jq -r '.[0].id // .[0].Id // empty' <<<"${presets}")" != "e2e-h264-aac" ]]; then
+if ! jq -e 'any(.[]; (.id // .Id) == "e2e-h264-aac")' <<<"${presets}" >/dev/null; then
     printf 'Expected e2e preset was not available: %s\n' "${presets}" >&2
     exit 1
 fi

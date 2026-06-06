@@ -2,19 +2,204 @@
 <html>
 <head>
     <title>Transcoded Downloads</title>
+    <style>
+        .transcodedDownloadsPage .td-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .transcodedDownloadsPage .td-row {
+            align-items: center;
+            display: flex;
+            gap: .75rem;
+            justify-content: space-between;
+            min-height: 2.5rem;
+        }
+
+        .transcodedDownloadsPage .td-row label {
+            margin: 0;
+        }
+
+        .transcodedDownloadsPage .td-toolbar {
+            align-items: center;
+            display: flex;
+            flex-wrap: wrap;
+            gap: .75rem;
+            margin: 1rem 0;
+        }
+
+        .transcodedDownloadsPage .td-table-wrap {
+            overflow-x: auto;
+        }
+
+        .transcodedDownloadsPage table {
+            border-collapse: collapse;
+            min-width: 62rem;
+            width: 100%;
+        }
+
+        .transcodedDownloadsPage th,
+        .transcodedDownloadsPage td {
+            padding: .45rem;
+            text-align: left;
+            vertical-align: middle;
+        }
+
+        .transcodedDownloadsPage th {
+            font-size: .9rem;
+            font-weight: 600;
+        }
+
+        .transcodedDownloadsPage .td-cell-sm {
+            width: 5rem;
+        }
+
+        .transcodedDownloadsPage .td-cell-md {
+            width: 8rem;
+        }
+
+        .transcodedDownloadsPage .td-icon-button {
+            min-width: 2.6rem;
+            width: 2.6rem;
+        }
+
+        .transcodedDownloadsPage .td-status {
+            min-height: 1.5rem;
+        }
+    </style>
 </head>
 <body>
-    <div id="transcoded-downloads-config-page" data-role="page" class="page type-interior pluginConfigurationPage">
+    <div id="transcoded-downloads-config-page" data-role="page" class="page type-interior pluginConfigurationPage transcodedDownloadsPage">
         <div data-role="content">
             <div class="content-primary">
                 <form id="transcoded-downloads-config-form">
                     <div class="sectionTitleContainer flex align-items-center">
                         <h2 class="sectionTitle">Transcoded Downloads</h2>
                     </div>
-                    <p>Configuration UI placeholder.</p>
+
+                    <div class="td-grid">
+                        <div class="paperList">
+                            <div class="td-row">
+                                <label for="td-enable-video">Video downloads</label>
+                                <label class="emby-checkbox-label">
+                                    <input id="td-enable-video" type="checkbox" is="emby-checkbox" />
+                                </label>
+                            </div>
+                            <div class="td-row">
+                                <label for="td-enable-music">Music downloads</label>
+                                <label class="emby-checkbox-label">
+                                    <input id="td-enable-music" type="checkbox" is="emby-checkbox" />
+                                </label>
+                            </div>
+                            <div class="td-row">
+                                <label for="td-enable-web-ui">Web item button</label>
+                                <label class="emby-checkbox-label">
+                                    <input id="td-enable-web-ui" type="checkbox" is="emby-checkbox" />
+                                </label>
+                            </div>
+                            <div class="td-row">
+                                <label for="td-enable-advanced-ffmpeg">Advanced FFmpeg arguments</label>
+                                <label class="emby-checkbox-label">
+                                    <input id="td-enable-advanced-ffmpeg" type="checkbox" is="emby-checkbox" />
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="paperList">
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="td-temp-directory">Temporary directory</label>
+                                <input id="td-temp-directory" type="text" is="emby-input" />
+                            </div>
+                            <div class="td-grid">
+                                <div class="inputContainer">
+                                    <label class="inputLabel inputLabelUnfocused" for="td-max-concurrent">Concurrent jobs</label>
+                                    <input id="td-max-concurrent" type="number" min="1" step="1" is="emby-input" />
+                                </div>
+                                <div class="inputContainer">
+                                    <label class="inputLabel inputLabelUnfocused" for="td-max-queue">Queue size</label>
+                                    <input id="td-max-queue" type="number" min="1" step="1" is="emby-input" />
+                                </div>
+                                <div class="inputContainer">
+                                    <label class="inputLabel inputLabelUnfocused" for="td-retention-hours">Retention hours</label>
+                                    <input id="td-retention-hours" type="number" min="1" step="1" is="emby-input" />
+                                </div>
+                                <div class="inputContainer">
+                                    <label class="inputLabel inputLabelUnfocused" for="td-max-temp-size">Temp size MB</label>
+                                    <input id="td-max-temp-size" type="number" min="1" step="1" is="emby-input" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sectionTitleContainer flex align-items-center">
+                        <h3 class="sectionTitle">Capability Profiles</h3>
+                    </div>
+                    <div class="td-toolbar">
+                        <button id="td-add-profile" type="button" is="emby-button" class="raised button-submit">
+                            <span>Add profile</span>
+                        </button>
+                    </div>
+                    <div class="td-table-wrap">
+                        <table class="paperList">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Backend</th>
+                                    <th>Video</th>
+                                    <th>Audio</th>
+                                    <th>Containers</th>
+                                    <th>Device</th>
+                                    <th>Tone map</th>
+                                    <th>Subtitles</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="td-profile-rows"></tbody>
+                        </table>
+                    </div>
+
+                    <div class="sectionTitleContainer flex align-items-center">
+                        <h3 class="sectionTitle">Presets</h3>
+                    </div>
+                    <div class="td-toolbar">
+                        <button id="td-add-preset" type="button" is="emby-button" class="raised button-submit">
+                            <span>Add preset</span>
+                        </button>
+                    </div>
+                    <div class="td-table-wrap">
+                        <table class="paperList">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Profile</th>
+                                    <th>Container</th>
+                                    <th>Video</th>
+                                    <th>Audio</th>
+                                    <th>Size</th>
+                                    <th>Bitrate</th>
+                                    <th>Enabled</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="td-preset-rows"></tbody>
+                        </table>
+                    </div>
+
+                    <div class="td-toolbar">
+                        <button type="submit" is="emby-button" class="raised button-submit">
+                            <span>Save</span>
+                        </button>
+                        <button id="td-reset-defaults" type="button" is="emby-button" class="raised">
+                            <span>Reset defaults</span>
+                        </button>
+                        <div id="td-status" class="td-status"></div>
+                    </div>
                 </form>
             </div>
         </div>
+        <script src="configurationpage?name=transcodeddownloadsjs"></script>
     </div>
 </body>
 </html>
