@@ -12,6 +12,7 @@ repository_dir="${repo_root}/repository"
 package_path="${dist_dir}/${plugin_name}_${version}.zip"
 repository_package_path="${repository_dir}/${plugin_name}_${version}.zip"
 artifact_timestamp="${PACKAGE_TIMESTAMP:-2026-06-05 00:00:00 UTC}"
+metadata_path="${publish_dir}/meta.json"
 
 rm -rf "${publish_dir}"
 dotnet publish "${repo_root}/${project}" -c "${configuration}" -o "${publish_dir}"
@@ -23,9 +24,26 @@ touch -d "${artifact_timestamp}" \
     "${publish_dir}/${plugin_name}.dll" \
     "${publish_dir}/${plugin_name}.pdb"
 
+cat >"${metadata_path}" <<EOF
+{
+  "category": "General",
+  "changelog": "Updated the plugin target to Jellyfin 10.11 and added an admin configuration UI.",
+  "description": "Adds Jellyfin API and Web UI support for downloading transcoded copies of movies, episodes, and music items using administrator-defined presets.",
+  "guid": "2dff9f1e-7a24-4c58-a1c8-74f4fd5312c8",
+  "name": "Transcoded Downloads",
+  "overview": "Download transcoded copies of Jellyfin media.",
+  "owner": "wivi514",
+  "targetAbi": "10.11.0.0",
+  "timestamp": "2026-06-05T00:00:00Z",
+  "version": "${version}"
+}
+EOF
+touch -d "${artifact_timestamp}" "${metadata_path}"
+
 (
     cd "${publish_dir}"
     zip -X -9 -q "${package_path}" \
+        "meta.json" \
         "${plugin_name}.dll" \
         "${plugin_name}.pdb"
 )

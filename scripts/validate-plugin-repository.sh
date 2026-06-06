@@ -25,11 +25,15 @@ if [ ! -f "${repository_package_path}" ]; then
 fi
 
 manifest_version="$(jq -r '.[0].versions[0].version' "${manifest_path}")"
+manifest_guid="$(jq -r '.[0].guid' "${manifest_path}")"
 manifest_checksum="$(jq -r '.[0].versions[0].checksum' "${manifest_path}")"
 manifest_source_url="$(jq -r '.[0].versions[0].sourceUrl' "${manifest_path}")"
 expected_source_url="https://raw.githubusercontent.com/wivi514/jellyfin-plugin-transcoded-downloads/master/repository/Jellyfin.Plugin.TranscodedDownloads_${version}.zip"
 actual_checksum="$(md5sum "${repository_package_path}" | awk '{print tolower($1)}')"
 dist_checksum="$(md5sum "${package_path}" | awk '{print tolower($1)}')"
+metadata="$(unzip -p "${repository_package_path}" meta.json)"
+metadata_version="$(jq -r '.version' <<<"${metadata}")"
+metadata_guid="$(jq -r '.guid' <<<"${metadata}")"
 
 if [ "${manifest_version}" != "${version}" ]; then
     printf 'Manifest version mismatch: expected %s, found %s\n' "${version}" "${manifest_version}" >&2
@@ -38,6 +42,16 @@ fi
 
 if [ "${manifest_source_url}" != "${expected_source_url}" ]; then
     printf 'Manifest sourceUrl mismatch:\nexpected: %s\nfound:    %s\n' "${expected_source_url}" "${manifest_source_url}" >&2
+    exit 1
+fi
+
+if [ "${metadata_version}" != "${manifest_version}" ]; then
+    printf 'Package meta.json version mismatch: expected %s, found %s\n' "${manifest_version}" "${metadata_version}" >&2
+    exit 1
+fi
+
+if [ "${metadata_guid}" != "${manifest_guid}" ]; then
+    printf 'Package meta.json guid mismatch: expected %s, found %s\n' "${manifest_guid}" "${metadata_guid}" >&2
     exit 1
 fi
 
