@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.TranscodedDownloads.Configuration;
@@ -7,6 +8,8 @@ using Jellyfin.Plugin.TranscodedDownloads.Controllers;
 using Jellyfin.Plugin.TranscodedDownloads.Enums;
 using Jellyfin.Plugin.TranscodedDownloads.Models;
 using Jellyfin.Plugin.TranscodedDownloads.Services;
+using MediaBrowser.Common.Api;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Xunit;
 
@@ -14,6 +17,17 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
 {
     public sealed class TranscodedDownloadsControllerTests
     {
+        [Fact]
+        public void Controller_RequiresDownloadPolicy()
+        {
+            var attribute = typeof(TranscodedDownloadsController)
+                .GetCustomAttributes(typeof(AuthorizeAttribute), inherit: true)
+                .Cast<AuthorizeAttribute>()
+                .Single();
+
+            Assert.Equal(Policies.Download, attribute.Policy);
+        }
+
         [Fact]
         public void CreateJob_WhenStartImmediatelyIsTrue_StartsCreatedJob()
         {

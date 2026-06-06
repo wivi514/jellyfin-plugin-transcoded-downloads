@@ -5,7 +5,9 @@ using Jellyfin.Plugin.TranscodedDownloads.Enums;
 using Jellyfin.Plugin.TranscodedDownloads.Exceptions;
 using Jellyfin.Plugin.TranscodedDownloads.Models;
 using Jellyfin.Plugin.TranscodedDownloads.Services;
+using MediaBrowser.Common.Api;
 using MediaBrowser.Controller.Library;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Jellyfin.Plugin.TranscodedDownloads.Controllers
@@ -14,6 +16,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Controllers
     /// API controller for transcoded download metadata.
     /// </summary>
     [ApiController]
+    [Authorize(Policy = Policies.Download)]
     [Route("TranscodedDownloads")]
     public sealed class TranscodedDownloadsController : ControllerBase
     {

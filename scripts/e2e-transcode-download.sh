@@ -48,7 +48,7 @@ wait_for_running_server() {
     local attempt
     for attempt in $(seq 1 90); do
         if curl -fsS "${base_url}/System/Info/Public" >/dev/null 2>&1 \
-            && curl -fsS "${base_url}/TranscodedDownloads/Presets" >/dev/null 2>&1; then
+            && curl -fsS "${base_url}/TranscodedDownloads/Presets" -H "X-Emby-Token: ${token}" >/dev/null 2>&1; then
             return 0
         fi
 
@@ -255,6 +255,12 @@ fi
 cleanup
 
 start_server running
+
+anonymous_status="$(curl -sS -o /dev/null -w '%{http_code}' "${base_url}/TranscodedDownloads/Presets")"
+if [[ "${anonymous_status}" != "401" && "${anonymous_status}" != "403" ]]; then
+    printf 'Expected anonymous preset request to be rejected, got HTTP %s\n' "${anonymous_status}" >&2
+    exit 1
+fi
 
 presets="$(curl -fsS "${base_url}/TranscodedDownloads/Presets" -H "X-Emby-Token: ${token}")"
 if ! jq -e 'any(.[]; (.id // .Id) == "e2e-h264-aac")' <<<"${presets}" >/dev/null; then
