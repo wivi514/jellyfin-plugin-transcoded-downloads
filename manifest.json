@@ -9,11 +9,11 @@
     "versions": [
       {
         "version": "0.2.0.0",
-        "changelog": "Updated the plugin target to Jellyfin 10.11 and added an admin configuration UI.",
+        "changelog": "Added popular transcode presets and a simple H.264 bitrate preset builder in the admin configuration UI.",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://raw.githubusercontent.com/wivi514/jellyfin-plugin-transcoded-downloads/master/repository/Jellyfin.Plugin.TranscodedDownloads_0.2.0.0.zip",
         "timestamp": "2026-06-05T00:00:00Z",
-        "checksum": "a646b9e9750fe55e5f9969b81349463f"
+        "checksum": "dc03bd6789e3aa2f8fb0e769018d504f"
       }
     ]
   }

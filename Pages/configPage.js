@@ -12,6 +12,16 @@
         container: containers,
         backend: backends
     };
+    var popularPresetTemplates = [
+        { id: '480p-h264-aac-mp4', name: '480p H.264 AAC MP4', width: 854, height: 480, videoBitrate: 2000, audioBitrate: 128, video: 'H264', audio: 'Aac', container: 'Mp4' },
+        { id: '720p-h264-aac-mp4', name: '720p H.264 AAC MP4', width: 1280, height: 720, videoBitrate: 4000, audioBitrate: 160, video: 'H264', audio: 'Aac', container: 'Mp4' },
+        { id: '1080p-h264-aac-mp4', name: '1080p H.264 AAC MP4', width: 1920, height: 1080, videoBitrate: 8000, audioBitrate: 192, video: 'H264', audio: 'Aac', container: 'Mp4' },
+        { id: '1440p-h264-aac-mp4', name: '1440p H.264 AAC MP4', width: 2560, height: 1440, videoBitrate: 16000, audioBitrate: 192, video: 'H264', audio: 'Aac', container: 'Mp4' },
+        { id: '2160p-h264-aac-mp4', name: '4K H.264 AAC MP4', width: 3840, height: 2160, videoBitrate: 35000, audioBitrate: 256, video: 'H264', audio: 'Aac', container: 'Mp4' },
+        { id: '1080p-h265-aac-mp4', name: '1080p H.265 AAC MP4', width: 1920, height: 1080, videoBitrate: 5000, audioBitrate: 192, video: 'H265', audio: 'Aac', container: 'Mp4' },
+        { id: '2160p-h265-aac-mp4', name: '4K H.265 AAC MP4', width: 3840, height: 2160, videoBitrate: 20000, audioBitrate: 256, video: 'H265', audio: 'Aac', container: 'Mp4' },
+        { id: '1080p-av1-opus-webm', name: '1080p AV1 Opus WebM', width: 1920, height: 1080, videoBitrate: 3500, audioBitrate: 160, video: 'Av1', audio: 'Opus', container: 'Webm' }
+    ];
     var state = null;
 
     function qs(page, selector) {
@@ -47,6 +57,10 @@
         return parsed > 0 ? parsed : fallback;
     }
 
+    function clamp(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+    }
+
     function optionalPositiveInt(value) {
         if (value === null || value === undefined || value === '') {
             return null;
@@ -63,11 +77,11 @@
     function defaultProfile() {
         return {
             Id: 'cpu-h264-aac',
-            Name: 'CPU H.264',
+            Name: 'CPU common codecs',
             Backend: 'Software',
-            AllowedVideoCodecs: ['H264'],
-            AllowedAudioCodecs: ['Aac'],
-            AllowedContainers: ['Mp4'],
+            AllowedVideoCodecs: ['H264', 'H265', 'Av1', 'Vp9'],
+            AllowedAudioCodecs: ['Aac', 'Opus'],
+            AllowedContainers: ['Mp4', 'Mkv', 'Webm'],
             SupportsHardwareDecode: false,
             SupportsHardwareEncode: false,
             SupportsToneMapping: true,
@@ -79,18 +93,22 @@
     }
 
     function defaultPreset(profileId) {
+        return presetFromTemplate(popularPresetTemplates[2], profileId, popularPresetTemplates[2].id);
+    }
+
+    function presetFromTemplate(template, profileId, presetId) {
         return {
-            Id: '1080p-h264-aac-mp4',
-            Name: '1080p H.264 AAC MP4',
+            Id: presetId || template.id,
+            Name: template.name,
             Enabled: true,
             CapabilityProfileId: profileId,
-            Container: 'Mp4',
-            VideoCodec: 'H264',
-            AudioCodec: 'Aac',
-            MaxWidth: 1920,
-            MaxHeight: 1080,
-            VideoBitrateKbps: 8000,
-            AudioBitrateKbps: 192,
+            Container: template.container,
+            VideoCodec: template.video,
+            AudioCodec: template.audio,
+            MaxWidth: template.width,
+            MaxHeight: template.height,
+            VideoBitrateKbps: template.videoBitrate,
+            AudioBitrateKbps: template.audioBitrate,
             AudioChannels: 2,
             AllowStreamCopyWhenCompatible: true,
             BurnSubtitles: false,
@@ -101,10 +119,43 @@
         };
     }
 
+    function defaultPopularPresets(profileId) {
+        return popularPresetTemplates.map(function (template) {
+            return presetFromTemplate(template, profileId, template.id);
+        });
+    }
+
     function addedDefaultPreset(profileId) {
         var preset = defaultPreset(profileId);
         preset.Id = id();
         return preset;
+    }
+
+    function simpleH264Preset(profileId, resolution, bitrateMbps) {
+        var parts = resolution.split('x');
+        var width = positiveInt(parts[0], 1920);
+        var height = positiveInt(parts[1], 1080);
+        var bitrate = clamp(positiveInt(bitrateMbps, 8), 2, 80);
+        return {
+            Id: id(),
+            Name: height + 'p H.264 AAC MP4 ' + bitrate + ' Mbps',
+            Enabled: true,
+            CapabilityProfileId: profileId,
+            Container: 'Mp4',
+            VideoCodec: 'H264',
+            AudioCodec: 'Aac',
+            MaxWidth: width,
+            MaxHeight: height,
+            VideoBitrateKbps: bitrate * 1000,
+            AudioBitrateKbps: height >= 2160 ? 256 : height >= 1080 ? 192 : 160,
+            AudioChannels: 2,
+            AllowStreamCopyWhenCompatible: true,
+            BurnSubtitles: false,
+            ToneMapHdrToSdr: true,
+            PreserveOriginalAudioIfCompatible: false,
+            IsVideoPreset: true,
+            IsAudioOnlyPreset: false
+        };
     }
 
     function normalizeProfile(profile) {
@@ -168,7 +219,7 @@
             return normalizePreset(preset, profiles[0].Id);
         });
         if (!presets.length) {
-            presets.push(defaultPreset(profiles[0].Id));
+            presets = defaultPopularPresets(profiles[0].Id);
         }
 
         config.EnableVideoDownloads = config.EnableVideoDownloads !== false;
@@ -639,6 +690,7 @@
         qs(page, '#td-max-queue').value = state.MaxQueueSize;
         qs(page, '#td-retention-hours').value = state.JobRetentionHours;
         qs(page, '#td-max-temp-size').value = state.MaxTempFolderSizeMb;
+        qs(page, '#td-simple-bitrate-number').value = qs(page, '#td-simple-bitrate').value;
         renderProfiles(page);
         renderPresets(page);
         updateSummary(page);
@@ -702,6 +754,16 @@
             });
         });
 
+        qs(page, '#td-simple-bitrate').addEventListener('input', function () {
+            qs(page, '#td-simple-bitrate-number').value = qs(page, '#td-simple-bitrate').value;
+        });
+
+        qs(page, '#td-simple-bitrate-number').addEventListener('input', function () {
+            var value = clamp(positiveInt(qs(page, '#td-simple-bitrate-number').value, 8), 2, 80);
+            qs(page, '#td-simple-bitrate-number').value = value;
+            qs(page, '#td-simple-bitrate').value = value;
+        });
+
         qs(page, '#td-add-profile').addEventListener('click', function () {
             var profile = defaultProfile();
             profile.Id = id();
@@ -716,10 +778,37 @@
             updateSummary(page);
         });
 
+        qs(page, '#td-add-simple-h264').addEventListener('click', function () {
+            state.Presets.push(simpleH264Preset(
+                state.CapabilityProfiles[0].Id,
+                qs(page, '#td-simple-resolution').value,
+                qs(page, '#td-simple-bitrate-number').value));
+            renderPresets(page);
+            updateSummary(page);
+            setStatus(page, 'H.264 preset added. Save to apply.');
+        });
+
+        qs(page, '#td-add-popular-presets').addEventListener('click', function () {
+            var existing = state.Presets.reduce(function (seen, preset) {
+                seen[preset.Id] = true;
+                return seen;
+            }, {});
+            var added = 0;
+            defaultPopularPresets(state.CapabilityProfiles[0].Id).forEach(function (preset) {
+                if (!existing[preset.Id]) {
+                    state.Presets.push(preset);
+                    added += 1;
+                }
+            });
+            renderPresets(page);
+            updateSummary(page);
+            setStatus(page, added ? 'Popular presets added. Save to apply.' : 'Popular presets already exist.');
+        });
+
         qs(page, '#td-reset-defaults').addEventListener('click', function () {
             state = normalizeConfig({
                 CapabilityProfiles: [defaultProfile()],
-                Presets: [defaultPreset('cpu-h264-aac')]
+                Presets: defaultPopularPresets('cpu-h264-aac')
             });
             render(page);
             setStatus(page, 'Defaults restored.');

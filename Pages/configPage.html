@@ -87,6 +87,41 @@
             grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
         }
 
+        .transcodedDownloadsPage .td-quick-panel {
+            border: 1px solid var(--td-border);
+            border-radius: 8px;
+            display: grid;
+            gap: 1rem;
+            grid-template-columns: minmax(14rem, 1.2fr) minmax(16rem, 2fr);
+            margin-bottom: 1rem;
+            padding: 1rem;
+        }
+
+        .transcodedDownloadsPage .td-quick-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: .35rem;
+        }
+
+        .transcodedDownloadsPage .td-quick-copy {
+            color: var(--td-muted);
+            font-size: .9rem;
+            line-height: 1.35;
+            margin: 0;
+        }
+
+        .transcodedDownloadsPage .td-range-row {
+            align-items: center;
+            display: grid;
+            gap: .75rem;
+            grid-template-columns: minmax(9rem, 1fr) 5.5rem;
+        }
+
+        .transcodedDownloadsPage .td-range-row input[type="range"] {
+            min-width: 0;
+            width: 100%;
+        }
+
         .transcodedDownloadsPage .td-toggle-list {
             display: grid;
             gap: .5rem;
@@ -196,7 +231,8 @@
 
         @media (max-width: 43rem) {
             .transcodedDownloadsPage .td-header,
-            .transcodedDownloadsPage .td-section-head {
+            .transcodedDownloadsPage .td-section-head,
+            .transcodedDownloadsPage .td-quick-panel {
                 display: grid;
             }
 
@@ -314,6 +350,39 @@
                                 <span class="material-icons" aria-hidden="true">add</span>
                                 <span>Add Preset</span>
                             </button>
+                        </div>
+                        <div class="td-quick-panel">
+                            <div>
+                                <div class="td-quick-title">Simple compatibility preset</div>
+                                <p class="td-quick-copy">Creates an H.264 AAC MP4 preset for broad device support. Choose a size and bitrate, then save.</p>
+                            </div>
+                            <div class="td-editor-grid">
+                                <div class="inputContainer">
+                                    <label class="inputLabel inputLabelUnfocused" for="td-simple-resolution">Resolution</label>
+                                    <select id="td-simple-resolution" is="emby-select" class="emby-select-withcolor emby-select">
+                                        <option value="854x480">480p</option>
+                                        <option value="1280x720">720p</option>
+                                        <option value="1920x1080" selected>1080p</option>
+                                        <option value="2560x1440">1440p</option>
+                                        <option value="3840x2160">4K</option>
+                                    </select>
+                                </div>
+                                <div class="inputContainer">
+                                    <label class="inputLabel inputLabelUnfocused" for="td-simple-bitrate">Video bitrate, Mbps</label>
+                                    <div class="td-range-row">
+                                        <input id="td-simple-bitrate" type="range" min="2" max="80" step="1" value="8" />
+                                        <input id="td-simple-bitrate-number" type="number" min="2" max="80" step="1" value="8" is="emby-input" />
+                                    </div>
+                                </div>
+                                <button id="td-add-simple-h264" type="button" is="emby-button" class="raised button-submit">
+                                    <span class="material-icons" aria-hidden="true">add_circle</span>
+                                    <span>Add H.264 Preset</span>
+                                </button>
+                                <button id="td-add-popular-presets" type="button" is="emby-button" class="raised">
+                                    <span class="material-icons" aria-hidden="true">playlist_add</span>
+                                    <span>Add Popular Set</span>
+                                </button>
+                            </div>
                         </div>
                         <div id="td-preset-rows" class="td-panel-list"></div>
                     </div>

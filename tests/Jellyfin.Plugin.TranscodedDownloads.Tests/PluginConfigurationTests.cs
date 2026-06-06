@@ -1,3 +1,4 @@
+using System.Linq;
 using Jellyfin.Plugin.TranscodedDownloads.Configuration;
 using Jellyfin.Plugin.TranscodedDownloads.Enums;
 using Jellyfin.Plugin.TranscodedDownloads.Services;
@@ -16,13 +17,19 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
             var presets = listingService.GetAvailablePresets(configuration);
 
             Assert.Single(configuration.CapabilityProfiles);
-            Assert.Single(configuration.Presets);
-            Assert.Single(presets);
-            Assert.Equal("1080p-h264-aac-mp4", presets[0].Id);
-            Assert.Equal(VideoCodec.H264, presets[0].VideoCodec);
-            Assert.Equal(AudioCodec.Aac, presets[0].AudioCodec);
-            Assert.Equal(ContainerFormat.Mp4, presets[0].Container);
-            Assert.Empty(presets[0].Warnings);
+            Assert.Equal(8, configuration.Presets.Count);
+            Assert.Equal(8, presets.Count);
+
+            var compatibilityPreset = presets.Single(preset => preset.Id == "1080p-h264-aac-mp4");
+            Assert.Equal(VideoCodec.H264, compatibilityPreset.VideoCodec);
+            Assert.Equal(AudioCodec.Aac, compatibilityPreset.AudioCodec);
+            Assert.Equal(ContainerFormat.Mp4, compatibilityPreset.Container);
+            Assert.Equal(8000, compatibilityPreset.VideoBitrateKbps);
+            Assert.Empty(compatibilityPreset.Warnings);
+
+            Assert.Contains(presets, preset => preset.Id == "2160p-h264-aac-mp4");
+            Assert.Contains(presets, preset => preset.Id == "1080p-h265-aac-mp4");
+            Assert.Contains(presets, preset => preset.Id == "1080p-av1-opus-webm");
         }
     }
 }

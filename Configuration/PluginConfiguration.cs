@@ -22,7 +22,14 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Configuration
             };
             Presets = new List<AdminTranscodePreset>
             {
-                CreateDefaultVideoPreset()
+                CreateVideoPreset("480p-h264-aac-mp4", "480p H.264 AAC MP4", VideoCodec.H264, ContainerFormat.Mp4, 854, 480, 2000, 128),
+                CreateVideoPreset("720p-h264-aac-mp4", "720p H.264 AAC MP4", VideoCodec.H264, ContainerFormat.Mp4, 1280, 720, 4000, 160),
+                CreateVideoPreset("1080p-h264-aac-mp4", "1080p H.264 AAC MP4", VideoCodec.H264, ContainerFormat.Mp4, 1920, 1080, 8000, 192),
+                CreateVideoPreset("1440p-h264-aac-mp4", "1440p H.264 AAC MP4", VideoCodec.H264, ContainerFormat.Mp4, 2560, 1440, 16000, 192),
+                CreateVideoPreset("2160p-h264-aac-mp4", "4K H.264 AAC MP4", VideoCodec.H264, ContainerFormat.Mp4, 3840, 2160, 35000, 256),
+                CreateVideoPreset("1080p-h265-aac-mp4", "1080p H.265 AAC MP4", VideoCodec.H265, ContainerFormat.Mp4, 1920, 1080, 5000, 192),
+                CreateVideoPreset("2160p-h265-aac-mp4", "4K H.265 AAC MP4", VideoCodec.H265, ContainerFormat.Mp4, 3840, 2160, 20000, 256),
+                CreateVideoPreset("1080p-av1-opus-webm", "1080p AV1 Opus WebM", VideoCodec.Av1, ContainerFormat.Webm, 1920, 1080, 3500, 160, AudioCodec.Opus)
             };
             UserPreferences = new List<UserDownloadPreference>();
         }
@@ -92,30 +99,39 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Configuration
             return new CapabilityProfile
             {
                 Id = DefaultCpuProfileId,
-                Name = "CPU H.264",
+                Name = "CPU common codecs",
                 Backend = TranscodeBackend.Software,
-                AllowedVideoCodecs = new List<VideoCodec> { VideoCodec.H264 },
-                AllowedAudioCodecs = new List<AudioCodec> { AudioCodec.Aac },
-                AllowedContainers = new List<ContainerFormat> { ContainerFormat.Mp4 },
+                AllowedVideoCodecs = new List<VideoCodec> { VideoCodec.H264, VideoCodec.H265, VideoCodec.Av1, VideoCodec.Vp9 },
+                AllowedAudioCodecs = new List<AudioCodec> { AudioCodec.Aac, AudioCodec.Opus },
+                AllowedContainers = new List<ContainerFormat> { ContainerFormat.Mp4, ContainerFormat.Mkv, ContainerFormat.Webm },
                 SupportsSubtitleBurnIn = true,
                 SupportsToneMapping = true
             };
         }
 
-        private static AdminTranscodePreset CreateDefaultVideoPreset()
+        private static AdminTranscodePreset CreateVideoPreset(
+            string id,
+            string name,
+            VideoCodec videoCodec,
+            ContainerFormat container,
+            int maxWidth,
+            int maxHeight,
+            int videoBitrateKbps,
+            int audioBitrateKbps,
+            AudioCodec audioCodec = AudioCodec.Aac)
         {
             return new AdminTranscodePreset
             {
-                Id = "1080p-h264-aac-mp4",
-                Name = "1080p H.264 AAC MP4",
+                Id = id,
+                Name = name,
                 CapabilityProfileId = DefaultCpuProfileId,
-                Container = ContainerFormat.Mp4,
-                VideoCodec = VideoCodec.H264,
-                AudioCodec = AudioCodec.Aac,
-                MaxWidth = 1920,
-                MaxHeight = 1080,
-                VideoBitrateKbps = 8000,
-                AudioBitrateKbps = 192,
+                Container = container,
+                VideoCodec = videoCodec,
+                AudioCodec = audioCodec,
+                MaxWidth = maxWidth,
+                MaxHeight = maxHeight,
+                VideoBitrateKbps = videoBitrateKbps,
+                AudioBitrateKbps = audioBitrateKbps,
                 AudioChannels = 2,
                 IsVideoPreset = true,
                 IsAudioOnlyPreset = false
