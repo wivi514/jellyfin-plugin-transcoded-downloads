@@ -2,7 +2,7 @@
 set -euo pipefail
 
 configuration="${CONFIGURATION:-Release}"
-version="${VERSION:-0.2.0.0}"
+version="${VERSION:-0.3.0.0}"
 project="Jellyfin.Plugin.TranscodedDownloads.csproj"
 plugin_name="Jellyfin.Plugin.TranscodedDownloads"
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -11,7 +11,7 @@ dist_dir="${repo_root}/dist"
 repository_dir="${repo_root}/repository"
 package_path="${dist_dir}/${plugin_name}_${version}.zip"
 repository_package_path="${repository_dir}/${plugin_name}_${version}.zip"
-artifact_timestamp="${PACKAGE_TIMESTAMP:-2026-06-05 00:00:00 UTC}"
+artifact_timestamp="${PACKAGE_TIMESTAMP:-2026-06-06 00:00:00 UTC}"
 metadata_path="${publish_dir}/meta.json"
 
 rm -rf "${publish_dir}"
@@ -34,7 +34,7 @@ cat >"${metadata_path}" <<EOF
   "overview": "Download transcoded copies of Jellyfin media.",
   "owner": "wivi514",
   "targetAbi": "10.11.0.0",
-  "timestamp": "2026-06-05T00:00:00Z",
+  "timestamp": "2026-06-06T00:00:00Z",
   "version": "${version}"
 }
 EOF

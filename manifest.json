@@ -8,12 +8,12 @@
     "category": "General",
     "versions": [
       {
-        "version": "0.2.0.0",
+        "version": "0.3.0.0",
         "changelog": "Added popular transcode presets and a simple H.264 bitrate preset builder in the admin configuration UI.",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://raw.githubusercontent.com/wivi514/jellyfin-plugin-transcoded-downloads/master/repository/Jellyfin.Plugin.TranscodedDownloads_0.2.0.0.zip",
-        "timestamp": "2026-06-05T00:00:00Z",
-        "checksum": "dc03bd6789e3aa2f8fb0e769018d504f"
+        "sourceUrl": "https://raw.githubusercontent.com/wivi514/jellyfin-plugin-transcoded-downloads/master/repository/Jellyfin.Plugin.TranscodedDownloads_0.3.0.0.zip",
+        "timestamp": "2026-06-06T00:00:00Z",
+        "checksum": "938a3005977f3074fba9241d7ae95b6c"
       }
     ]
   }
