@@ -12,6 +12,7 @@ media_dir="${work_dir}/media"
 download_dir="${work_dir}/download"
 plugin_dir="${config_dir}/plugins/TranscodedDownloads_0.2.0.0"
 package_path="${repo_root}/dist/Jellyfin.Plugin.TranscodedDownloads_0.2.0.0.zip"
+plugin_id="2dff9f1e-7a24-4c58-a1c8-74f4fd5312c8"
 password="JtdE2ePassword123"
 username="root"
 auth_header='Authorization: MediaBrowser Client="JtdE2E", Device="E2E", DeviceId="jtd-e2e", Version="1.0"'
@@ -102,6 +103,76 @@ api_post() {
         -d "${body}"
 }
 
+plugin_config_request() {
+    local method="$1"
+    local body="${2:-}"
+    if [[ -n "${body}" ]]; then
+        curl -fsS -X "${method}" "${base_url}/Plugins/${plugin_id}/Configuration" \
+            -H "X-Emby-Token: ${token}" \
+            -H "Content-Type: application/json" \
+            -d "${body}"
+    else
+        curl -fsS -X "${method}" "${base_url}/Plugins/${plugin_id}/Configuration" \
+            -H "X-Emby-Token: ${token}"
+    fi
+}
+
+save_e2e_plugin_configuration() {
+    jq -n \
+        --arg tempDirectory "/cache/transcoded-downloads" \
+        '{
+            EnableVideoDownloads: true,
+            EnableMusicDownloads: true,
+            EnableWebUiInjection: false,
+            EnableAdvancedUnsafeFfmpegArguments: false,
+            MaxConcurrentJobs: 1,
+            MaxQueueSize: 10,
+            JobRetentionHours: 24,
+            MaxTempFolderSizeMb: 50000,
+            TempDirectory: $tempDirectory,
+            CapabilityProfiles: [
+                {
+                    Id: "cpu-e2e",
+                    Name: "CPU E2E",
+                    Backend: "Software",
+                    AllowedVideoCodecs: ["H264"],
+                    AllowedAudioCodecs: ["Aac"],
+                    AllowedContainers: ["Mp4"],
+                    SupportsHardwareDecode: false,
+                    SupportsHardwareEncode: false,
+                    SupportsToneMapping: false,
+                    SupportsSubtitleBurnIn: true,
+                    SupportsTwoPass: false,
+                    DevicePath: "",
+                    Notes: ""
+                }
+            ],
+            Presets: [
+                {
+                    Id: "e2e-h264-aac",
+                    Name: "E2E H264 AAC MP4",
+                    Enabled: true,
+                    CapabilityProfileId: "cpu-e2e",
+                    Container: "Mp4",
+                    VideoCodec: "H264",
+                    AudioCodec: "Aac",
+                    MaxWidth: 160,
+                    MaxHeight: 90,
+                    VideoBitrateKbps: 256,
+                    AudioBitrateKbps: 64,
+                    AudioChannels: 1,
+                    AllowStreamCopyWhenCompatible: false,
+                    BurnSubtitles: false,
+                    ToneMapHdrToSdr: false,
+                    PreserveOriginalAudioIfCompatible: false,
+                    IsVideoPreset: true,
+                    IsAudioOnlyPreset: false
+                }
+            ],
+            UserPreferences: []
+        }' | plugin_config_request POST @-
+}
+
 require_command curl
 require_command ffmpeg
 require_command ffprobe
@@ -174,68 +245,14 @@ if [[ -z "${item_id}" ]]; then
     exit 1
 fi
 
-cleanup
+save_e2e_plugin_configuration
+saved_config="$(plugin_config_request GET)"
+if ! jq -e 'any(.Presets[]?; .Id == "e2e-h264-aac")' <<<"${saved_config}" >/dev/null; then
+    printf 'Plugin configuration API did not persist the e2e preset: %s\n' "${saved_config}" >&2
+    exit 1
+fi
 
-cat >"${config_dir}/plugins/configurations/Jellyfin.Plugin.TranscodedDownloads.xml" <<'XML'
-<?xml version="1.0" encoding="utf-8"?>
-<PluginConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <EnableVideoDownloads>true</EnableVideoDownloads>
-  <EnableMusicDownloads>true</EnableMusicDownloads>
-  <EnableWebUiInjection>false</EnableWebUiInjection>
-  <EnableAdvancedUnsafeFfmpegArguments>false</EnableAdvancedUnsafeFfmpegArguments>
-  <MaxConcurrentJobs>1</MaxConcurrentJobs>
-  <MaxQueueSize>10</MaxQueueSize>
-  <JobRetentionHours>24</JobRetentionHours>
-  <MaxTempFolderSizeMb>50000</MaxTempFolderSizeMb>
-  <TempDirectory>/cache/transcoded-downloads</TempDirectory>
-  <CapabilityProfiles>
-    <CapabilityProfile>
-      <Id>cpu-e2e</Id>
-      <Name>CPU E2E</Name>
-      <Backend>Software</Backend>
-      <AllowedVideoCodecs>
-        <VideoCodec>H264</VideoCodec>
-      </AllowedVideoCodecs>
-      <AllowedAudioCodecs>
-        <AudioCodec>Aac</AudioCodec>
-      </AllowedAudioCodecs>
-      <AllowedContainers>
-        <ContainerFormat>Mp4</ContainerFormat>
-      </AllowedContainers>
-      <SupportsHardwareDecode>false</SupportsHardwareDecode>
-      <SupportsHardwareEncode>false</SupportsHardwareEncode>
-      <SupportsToneMapping>false</SupportsToneMapping>
-      <SupportsSubtitleBurnIn>true</SupportsSubtitleBurnIn>
-      <SupportsTwoPass>false</SupportsTwoPass>
-      <DevicePath />
-      <Notes />
-    </CapabilityProfile>
-  </CapabilityProfiles>
-  <Presets>
-    <AdminTranscodePreset>
-      <Id>e2e-h264-aac</Id>
-      <Name>E2E H264 AAC MP4</Name>
-      <Enabled>true</Enabled>
-      <CapabilityProfileId>cpu-e2e</CapabilityProfileId>
-      <Container>Mp4</Container>
-      <VideoCodec>H264</VideoCodec>
-      <AudioCodec>Aac</AudioCodec>
-      <MaxWidth>160</MaxWidth>
-      <MaxHeight>90</MaxHeight>
-      <VideoBitrateKbps>256</VideoBitrateKbps>
-      <AudioBitrateKbps>64</AudioBitrateKbps>
-      <AudioChannels>1</AudioChannels>
-      <AllowStreamCopyWhenCompatible>false</AllowStreamCopyWhenCompatible>
-      <BurnSubtitles>false</BurnSubtitles>
-      <ToneMapHdrToSdr>false</ToneMapHdrToSdr>
-      <PreserveOriginalAudioIfCompatible>false</PreserveOriginalAudioIfCompatible>
-      <IsVideoPreset>true</IsVideoPreset>
-      <IsAudioOnlyPreset>false</IsAudioOnlyPreset>
-    </AdminTranscodePreset>
-  </Presets>
-  <UserPreferences />
-</PluginConfiguration>
-XML
+cleanup
 
 start_server running
 
