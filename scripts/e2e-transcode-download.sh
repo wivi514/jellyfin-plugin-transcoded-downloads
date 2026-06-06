@@ -15,6 +15,8 @@ package_path="${repo_root}/dist/Jellyfin.Plugin.TranscodedDownloads_0.2.0.0.zip"
 plugin_id="2dff9f1e-7a24-4c58-a1c8-74f4fd5312c8"
 password="JtdE2ePassword123"
 username="root"
+other_password="JtdE2eOtherPassword123"
+other_username="other-downloader"
 auth_header='Authorization: MediaBrowser Client="JtdE2E", Device="E2E", DeviceId="jtd-e2e", Version="1.0"'
 
 require_command() {
@@ -101,6 +103,15 @@ api_post() {
         -H "X-Emby-Token: ${token}" \
         -H "Content-Type: application/json" \
         -d "${body}"
+}
+
+authenticate_user() {
+    local auth_username="$1"
+    local auth_password="$2"
+    curl -fsS -X POST "${base_url}/Users/AuthenticateByName" \
+        -H "Content-Type: application/json" \
+        -H "${auth_header}" \
+        -d "{\"Username\":\"${auth_username}\",\"Pw\":\"${auth_password}\"}"
 }
 
 plugin_config_request() {
@@ -215,12 +226,21 @@ curl -fsS -X POST "${base_url}/Startup/User" \
 
 curl -fsS -X POST "${base_url}/Startup/Complete" >/dev/null
 
-auth_response="$(curl -fsS -X POST "${base_url}/Users/AuthenticateByName" \
-    -H "Content-Type: application/json" \
-    -H "${auth_header}" \
-    -d "{\"Username\":\"${username}\",\"Pw\":\"${password}\"}")"
+auth_response="$(authenticate_user "${username}" "${password}")"
 token="$(jq -r '.AccessToken' <<<"${auth_response}")"
 user_id="$(jq -r '.User.Id' <<<"${auth_response}")"
+
+other_user_response="$(api_post "/Users/New" "{\"Name\":\"${other_username}\",\"Password\":\"${other_password}\"}")"
+other_user_id="$(jq -r '.Id // .id' <<<"${other_user_response}")"
+other_policy="$(curl -fsS "${base_url}/Users/${other_user_id}" -H "X-Emby-Token: ${token}" \
+    | jq '.Policy
+        | .IsAdministrator = false
+        | .EnableContentDownloading = true
+        | .EnableAllFolders = true
+        | .EnableAllChannels = true
+        | .EnableAllDevices = true
+        | .IsDisabled = false')"
+api_post "/Users/${other_user_id}/Policy" "${other_policy}" >/dev/null
 
 api_post "/Library/VirtualFolders?name=E2E%20Movies&collectionType=movies&refreshLibrary=true" \
     '{"EnableRealtimeMonitor":false}' >/dev/null
@@ -256,6 +276,9 @@ cleanup
 
 start_server running
 
+other_auth_response="$(authenticate_user "${other_username}" "${other_password}")"
+other_token="$(jq -r '.AccessToken' <<<"${other_auth_response}")"
+
 anonymous_status="$(curl -sS -o /dev/null -w '%{http_code}' "${base_url}/TranscodedDownloads/Presets")"
 if [[ "${anonymous_status}" != "401" && "${anonymous_status}" != "403" ]]; then
     printf 'Expected anonymous preset request to be rejected, got HTTP %s\n' "${anonymous_status}" >&2
@@ -271,6 +294,19 @@ fi
 job_response="$(api_post "/TranscodedDownloads/Jobs" \
     "{\"itemId\":\"${item_id}\",\"presetId\":\"e2e-h264-aac\",\"startImmediately\":true}")"
 job_id="$(jq -r '.id // .Id' <<<"${job_response}")"
+
+other_jobs="$(curl -fsS "${base_url}/TranscodedDownloads/Jobs" -H "X-Emby-Token: ${other_token}")"
+if jq -e --arg jobId "${job_id}" 'any(.[]; ((.id // .Id) | ascii_downcase) == ($jobId | ascii_downcase))' <<<"${other_jobs}" >/dev/null; then
+    printf 'Second user could list the first user job: %s\n' "${other_jobs}" >&2
+    exit 1
+fi
+
+other_job_status="$(curl -sS -o /dev/null -w '%{http_code}' "${base_url}/TranscodedDownloads/Jobs/${job_id}" \
+    -H "X-Emby-Token: ${other_token}")"
+if [[ "${other_job_status}" != "403" ]]; then
+    printf 'Expected second user job lookup to be forbidden, got HTTP %s\n' "${other_job_status}" >&2
+    exit 1
+fi
 
 status=""
 for _ in $(seq 1 60); do
@@ -298,6 +334,13 @@ fi
 curl -fsS "${base_url}/TranscodedDownloads/Jobs/${job_id}/File" \
     -H "X-Emby-Token: ${token}" \
     -o "${download_dir}/transcoded.mp4"
+
+other_file_status="$(curl -sS -o /dev/null -w '%{http_code}' "${base_url}/TranscodedDownloads/Jobs/${job_id}/File" \
+    -H "X-Emby-Token: ${other_token}")"
+if [[ "${other_file_status}" != "403" ]]; then
+    printf 'Expected second user file download to be forbidden, got HTTP %s\n' "${other_file_status}" >&2
+    exit 1
+fi
 
 if [[ ! -s "${download_dir}/transcoded.mp4" ]]; then
     printf 'Downloaded transcode file is empty.\n' >&2

@@ -75,7 +75,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
         }
 
         /// <inheritdoc />
-        public DownloadJobDto CreateJob(CreateDownloadJobRequest request, PluginConfiguration configuration)
+        public DownloadJobDto CreateJob(CreateDownloadJobRequest request, PluginConfiguration configuration, Guid userId)
         {
             if (request == null)
             {
@@ -85,6 +85,11 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
             if (configuration == null)
             {
                 throw new ArgumentNullException(nameof(configuration));
+            }
+
+            if (userId == Guid.Empty)
+            {
+                throw new ArgumentException("UserId is required.", nameof(userId));
             }
 
             if (request.ItemId == Guid.Empty)
@@ -131,7 +136,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
                 {
                     Id = jobId,
                     ItemId = request.ItemId,
-                    UserId = Guid.Empty,
+                    UserId = userId,
                     PresetId = preset.Id,
                     Status = JobStatus.Queued,
                     ProgressPercent = 0,

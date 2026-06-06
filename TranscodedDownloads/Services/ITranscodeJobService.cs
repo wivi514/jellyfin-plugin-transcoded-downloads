@@ -17,8 +17,9 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Services
         /// </summary>
         /// <param name="request">The create job request.</param>
         /// <param name="configuration">The plugin configuration.</param>
+        /// <param name="userId">The user that owns the job.</param>
         /// <returns>The created job.</returns>
-        DownloadJobDto CreateJob(CreateDownloadJobRequest request, PluginConfiguration configuration);
+        DownloadJobDto CreateJob(CreateDownloadJobRequest request, PluginConfiguration configuration, Guid userId);
 
         /// <summary>
         /// Gets the current in-memory jobs.

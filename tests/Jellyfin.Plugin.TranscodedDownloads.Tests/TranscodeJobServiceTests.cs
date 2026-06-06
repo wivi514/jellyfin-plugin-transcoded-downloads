@@ -15,6 +15,9 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
 {
     public sealed class TranscodeJobServiceTests : IDisposable
     {
+        private static readonly Guid OwnerUserId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        private static readonly Guid OtherUserId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+
         private readonly string _tempRoot;
         private readonly FakeTranscodeProcessRunner _processRunner;
         private readonly FakeMediaItemResolver _mediaItemResolver;
@@ -46,11 +49,11 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
                 StartImmediately = true
             };
 
-            var job = service.CreateJob(request, configuration);
+            var job = service.CreateJob(request, configuration, OwnerUserId);
 
             Assert.NotEqual(Guid.Empty, job.Id);
             Assert.Equal(request.ItemId, job.ItemId);
-            Assert.Equal(Guid.Empty, job.UserId);
+            Assert.Equal(OwnerUserId, job.UserId);
             Assert.Equal("video-preset", job.PresetId);
             Assert.Equal(JobStatus.Queued, job.Status);
             Assert.Equal(0, job.ProgressPercent);
@@ -77,7 +80,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
                 PresetId = "missing-preset"
             };
 
-            Assert.Throws<InvalidPresetException>(() => service.CreateJob(request, configuration));
+            Assert.Throws<InvalidPresetException>(() => service.CreateJob(request, configuration, OwnerUserId));
         }
 
         [Fact]
@@ -92,7 +95,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
                 PresetId = "video-preset"
             };
 
-            Assert.Throws<MediaItemResolutionException>(() => service.CreateJob(request, configuration));
+            Assert.Throws<MediaItemResolutionException>(() => service.CreateJob(request, configuration, OwnerUserId));
         }
 
         [Fact]
@@ -113,7 +116,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
                 PresetId = "video-preset"
             };
 
-            Assert.Throws<MediaItemResolutionException>(() => service.CreateJob(request, configuration));
+            Assert.Throws<MediaItemResolutionException>(() => service.CreateJob(request, configuration, OwnerUserId));
         }
 
         [Fact]
@@ -123,7 +126,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
             var service = CreateService();
             var createdJob = service.CreateJob(
                 new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" },
-                configuration);
+                configuration, OwnerUserId);
             _mediaItemResolver.Item = new MediaItemInfo
             {
                 ItemId = createdJob.ItemId,
@@ -154,7 +157,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
                 PresetId = "video-preset"
             };
 
-            Assert.Throws<InvalidPresetException>(() => service.CreateJob(request, configuration));
+            Assert.Throws<InvalidPresetException>(() => service.CreateJob(request, configuration, OwnerUserId));
         }
 
         [Fact]
@@ -166,12 +169,12 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
 
             service.CreateJob(
                 new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" },
-                configuration);
+                configuration, OwnerUserId);
 
             Assert.Throws<TranscodeQueueFullException>(
                 () => service.CreateJob(
                     new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" },
-                    configuration));
+                    configuration, OwnerUserId));
             Assert.Single(Directory.GetDirectories(_tempRoot));
         }
 
@@ -183,8 +186,8 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
             var firstRequest = new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" };
             var secondRequest = new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" };
 
-            var firstJob = service.CreateJob(firstRequest, configuration);
-            var secondJob = service.CreateJob(secondRequest, configuration);
+            var firstJob = service.CreateJob(firstRequest, configuration, OwnerUserId);
+            var secondJob = service.CreateJob(secondRequest, configuration, OtherUserId);
 
             var jobs = service.GetJobs();
 
@@ -200,7 +203,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
             var service = CreateService();
             var createdJob = service.CreateJob(
                 new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" },
-                configuration);
+                configuration, OwnerUserId);
 
             var listedJob = service.GetJobs().Single();
             listedJob.Status = JobStatus.Failed;
@@ -217,7 +220,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
             var service = CreateService();
             var createdJob = service.CreateJob(
                 new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" },
-                configuration);
+                configuration, OwnerUserId);
 
             var job = service.GetJob(createdJob.Id);
 
@@ -242,7 +245,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
             var service = CreateService();
             var createdJob = service.CreateJob(
                 new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" },
-                configuration);
+                configuration, OwnerUserId);
             var tempDirectory = createdJob.TempDirectory;
 
             var deleted = service.DeleteJob(createdJob.Id);
@@ -271,7 +274,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
             var service = CreateService();
             var createdJob = service.CreateJob(
                 new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" },
-                configuration);
+                configuration, OwnerUserId);
             service.TryUpdateJobStatus(createdJob.Id, JobStatus.Running);
 
             var deleted = service.DeleteJob(createdJob.Id);
@@ -294,7 +297,21 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
                 PresetId = "video-preset"
             };
 
-            Assert.Throws<ArgumentException>(() => service.CreateJob(request, configuration));
+            Assert.Throws<ArgumentException>(() => service.CreateJob(request, configuration, OwnerUserId));
+        }
+
+        [Fact]
+        public void CreateJob_WhenUserIdIsEmpty_ThrowsArgumentException()
+        {
+            var configuration = CreateConfiguration();
+            var service = CreateService();
+            var request = new CreateDownloadJobRequest
+            {
+                ItemId = Guid.NewGuid(),
+                PresetId = "video-preset"
+            };
+
+            Assert.Throws<ArgumentException>(() => service.CreateJob(request, configuration, Guid.Empty));
         }
 
         [Fact]
@@ -304,7 +321,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
             var service = CreateService();
             var createdJob = service.CreateJob(
                 new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" },
-                configuration);
+                configuration, OwnerUserId);
             _processRunner.OutputBytes = new byte[] { 1, 2, 3 };
 
             var started = await service.StartJobAsync(createdJob.Id, configuration, CancellationToken.None);
@@ -329,7 +346,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
             var service = CreateService();
             var createdJob = service.CreateJob(
                 new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" },
-                configuration);
+                configuration, OwnerUserId);
             _processRunner.Result = TranscodeProcessResult.Failure(1, "encoder failed");
 
             var started = await service.StartJobAsync(createdJob.Id, configuration, CancellationToken.None);
@@ -360,7 +377,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
             var service = CreateService();
             var createdJob = service.CreateJob(
                 new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" },
-                configuration);
+                configuration, OwnerUserId);
             service.TryUpdateJobStatus(createdJob.Id, JobStatus.Completed);
 
             var started = await service.StartJobAsync(createdJob.Id, configuration, CancellationToken.None);
@@ -376,7 +393,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
             var service = CreateService();
             var createdJob = service.CreateJob(
                 new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" },
-                configuration);
+                configuration, OwnerUserId);
             _processRunner.OutputBytes = new byte[] { 1, 2, 3 };
             await service.StartJobAsync(createdJob.Id, configuration, CancellationToken.None);
 
@@ -395,7 +412,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
             var service = CreateService();
             var createdJob = service.CreateJob(
                 new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" },
-                configuration);
+                configuration, OwnerUserId);
 
             var file = service.GetCompletedJobFile(createdJob.Id);
 
@@ -419,7 +436,7 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Tests
             var service = CreateService();
             var createdJob = service.CreateJob(
                 new CreateDownloadJobRequest { ItemId = Guid.NewGuid(), PresetId = "video-preset" },
-                configuration);
+                configuration, OwnerUserId);
             _processRunner.OutputBytes = new byte[] { 1, 2, 3 };
             await service.StartJobAsync(createdJob.Id, configuration, CancellationToken.None);
             File.Delete(createdJob.OutputPath!);

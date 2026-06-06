@@ -1,12 +1,15 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Jellyfin.Plugin.TranscodedDownloads.Configuration;
 using Jellyfin.Plugin.TranscodedDownloads.Enums;
 using Jellyfin.Plugin.TranscodedDownloads.Exceptions;
 using Jellyfin.Plugin.TranscodedDownloads.Models;
 using Jellyfin.Plugin.TranscodedDownloads.Services;
+using Jellyfin.Database.Implementations.Enums;
 using MediaBrowser.Common.Api;
 using MediaBrowser.Controller.Library;
+using MediaBrowser.Controller.Net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -27,6 +30,8 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Controllers
         private readonly ITranscodeJobService _transcodeJobService;
         private readonly ITranscodeJobStarter _transcodeJobStarter;
         private readonly Func<PluginConfiguration?> _configurationProvider;
+        private readonly Func<AuthorizationInfo> _authorizationInfoProvider;
+        private readonly Func<AuthorizationInfo, bool> _administratorAuthorizationProvider;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="TranscodedDownloadsController"/> class.
@@ -48,6 +53,27 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Controllers
         /// <summary>
         /// Initializes a new instance of the <see cref="TranscodedDownloadsController"/> class.
         /// </summary>
+        /// <param name="libraryManager">The Jellyfin library manager.</param>
+        /// <param name="authorizationContext">The Jellyfin authorization context.</param>
+        public TranscodedDownloadsController(ILibraryManager libraryManager, IAuthorizationContext authorizationContext)
+            : this(
+                new PresetListingService(),
+                CreateRuntimeJobService(libraryManager),
+                new BackgroundTranscodeJobStarter(CreateRuntimeJobService(libraryManager)),
+                () => Plugin.Instance?.Configuration,
+                () => new AuthorizationInfo())
+        {
+            if (authorizationContext == null)
+            {
+                throw new ArgumentNullException(nameof(authorizationContext));
+            }
+
+            _authorizationInfoProvider = () => authorizationContext.GetAuthorizationInfo(Request).GetAwaiter().GetResult();
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TranscodedDownloadsController"/> class.
+        /// </summary>
         /// <param name="presetListingService">The preset listing service.</param>
         /// <param name="transcodeJobService">The transcode job service.</param>
         public TranscodedDownloadsController(
@@ -57,7 +83,8 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Controllers
                 presetListingService,
                 transcodeJobService,
                 new BackgroundTranscodeJobStarter(transcodeJobService),
-                () => Plugin.Instance?.Configuration)
+                () => Plugin.Instance?.Configuration,
+                () => new AuthorizationInfo())
         {
         }
 
@@ -65,12 +92,16 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Controllers
             IPresetListingService presetListingService,
             ITranscodeJobService transcodeJobService,
             ITranscodeJobStarter transcodeJobStarter,
-            Func<PluginConfiguration?> configurationProvider)
+            Func<PluginConfiguration?> configurationProvider,
+            Func<AuthorizationInfo> authorizationInfoProvider,
+            Func<AuthorizationInfo, bool>? administratorAuthorizationProvider = null)
         {
             _presetListingService = presetListingService ?? throw new ArgumentNullException(nameof(presetListingService));
             _transcodeJobService = transcodeJobService ?? throw new ArgumentNullException(nameof(transcodeJobService));
             _transcodeJobStarter = transcodeJobStarter ?? throw new ArgumentNullException(nameof(transcodeJobStarter));
             _configurationProvider = configurationProvider ?? throw new ArgumentNullException(nameof(configurationProvider));
+            _authorizationInfoProvider = authorizationInfoProvider ?? throw new ArgumentNullException(nameof(authorizationInfoProvider));
+            _administratorAuthorizationProvider = administratorAuthorizationProvider ?? IsAdministrator;
         }
 
         /// <summary>
@@ -105,7 +136,8 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Controllers
 
             try
             {
-                var job = _transcodeJobService.CreateJob(request, configuration);
+                var authorizationInfo = GetAuthorizationInfo();
+                var job = _transcodeJobService.CreateJob(request, configuration, authorizationInfo.UserId);
                 if (request.StartImmediately)
                 {
                     _transcodeJobStarter.StartJob(job.Id, configuration);
@@ -138,7 +170,14 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Controllers
         [HttpGet("Jobs")]
         public ActionResult<IReadOnlyList<DownloadJobDto>> GetJobs()
         {
-            return Ok(_transcodeJobService.GetJobs());
+            var authorizationInfo = GetAuthorizationInfo();
+            var jobs = _transcodeJobService.GetJobs();
+            if (!_administratorAuthorizationProvider(authorizationInfo))
+            {
+                jobs = jobs.Where(job => job.UserId == authorizationInfo.UserId).ToList();
+            }
+
+            return Ok(jobs);
         }
 
         /// <summary>
@@ -155,6 +194,11 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Controllers
                 return NotFound();
             }
 
+            if (!CanAccessJob(job))
+            {
+                return Forbid();
+            }
+
             return Ok(job);
         }
 
@@ -166,6 +210,17 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Controllers
         [HttpDelete("Jobs/{jobId}")]
         public IActionResult DeleteJob(Guid jobId)
         {
+            var job = _transcodeJobService.GetJob(jobId);
+            if (job == null)
+            {
+                return NotFound();
+            }
+
+            if (!CanAccessJob(job))
+            {
+                return Forbid();
+            }
+
             if (!_transcodeJobService.DeleteJob(jobId))
             {
                 return NotFound();
@@ -182,6 +237,17 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Controllers
         [HttpGet("Jobs/{jobId}/File")]
         public IActionResult GetJobFile(Guid jobId)
         {
+            var job = _transcodeJobService.GetJob(jobId);
+            if (job == null)
+            {
+                return NotFound();
+            }
+
+            if (!CanAccessJob(job))
+            {
+                return Forbid();
+            }
+
             var file = _transcodeJobService.GetCompletedJobFile(jobId);
             return file.Status switch
             {
@@ -191,6 +257,29 @@ namespace Jellyfin.Plugin.TranscodedDownloads.Controllers
                 CompletedJobFileStatus.Available => PhysicalFile(file.Path!, file.ContentType!, file.DownloadFileName),
                 _ => StatusCode(500)
             };
+        }
+
+        private AuthorizationInfo GetAuthorizationInfo()
+        {
+            var authorizationInfo = _authorizationInfoProvider();
+            if (authorizationInfo.UserId == Guid.Empty)
+            {
+                throw new InvalidOperationException("An authenticated Jellyfin user is required.");
+            }
+
+            return authorizationInfo;
+        }
+
+        private bool CanAccessJob(DownloadJobDto job)
+        {
+            var authorizationInfo = GetAuthorizationInfo();
+            return job.UserId == authorizationInfo.UserId || _administratorAuthorizationProvider(authorizationInfo);
+        }
+
+        private static bool IsAdministrator(AuthorizationInfo authorizationInfo)
+        {
+            return authorizationInfo.User?.Permissions.Any(permission =>
+                permission.Kind == PermissionKind.IsAdministrator && permission.Value) == true;
         }
 
         private static ITranscodeJobService CreateRuntimeJobService(ILibraryManager libraryManager)
