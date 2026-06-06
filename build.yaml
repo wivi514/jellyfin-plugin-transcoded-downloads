@@ -1,7 +1,7 @@
 ---
 name: "Transcoded Downloads"
 guid: "2dff9f1e-7a24-4c58-a1c8-74f4fd5312c8"
-version: "0.3.1.0"
+version: "0.3.2.0"
 targetAbi: "10.11.0.0"
 framework: "net9.0"
 overview: "Download transcoded copies of Jellyfin media."
@@ -14,4 +14,4 @@ artifacts:
   - "Jellyfin.Plugin.TranscodedDownloads.dll"
   - "Jellyfin.Plugin.TranscodedDownloads.pdb"
 changelog: >
-  Fixed assembly version metadata so Jellyfin can uninstall and upgrade the plugin reliably.
+  Refined the plugin settings page with compact summaries, simpler preset setup, and collapsible advanced editors.

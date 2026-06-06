@@ -300,6 +300,41 @@
         return container;
     }
 
+    function detailsRow(title, subtitle, chipValues, remove) {
+        var details = document.createElement('details');
+        var summary = document.createElement('summary');
+        var main = document.createElement('span');
+        var titleElement = document.createElement('span');
+        var subtitleElement = document.createElement('span');
+        var actions = document.createElement('span');
+        var body = document.createElement('div');
+
+        details.className = 'td-details';
+        summary.className = 'td-details-summary';
+        main.className = 'td-row-main';
+        titleElement.className = 'td-row-title';
+        subtitleElement.className = 'td-row-subtitle';
+        actions.className = 'td-row-actions';
+        body.className = 'td-details-body';
+
+        titleElement.textContent = title;
+        subtitleElement.textContent = subtitle;
+        main.appendChild(titleElement);
+        main.appendChild(subtitleElement);
+
+        summary.appendChild(main);
+        summary.appendChild(chips(chipValues));
+        actions.appendChild(remove);
+        summary.appendChild(actions);
+        details.appendChild(summary);
+        details.appendChild(body);
+
+        return {
+            details: details,
+            body: body
+        };
+    }
+
     function chips(values) {
         var row = document.createElement('div');
         row.className = 'td-chip-row';
@@ -324,7 +359,11 @@
         button.className = 'emby-button td-icon-button';
         button.title = 'Remove';
         button.innerHTML = '<span class="material-icons" aria-hidden="true">delete</span>';
-        button.addEventListener('click', onClick);
+        button.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            onClick();
+        });
         return button;
     }
 
@@ -403,10 +442,6 @@
         }
 
         state.CapabilityProfiles.forEach(function (profile, index) {
-            var panel = document.createElement('div');
-            var head = document.createElement('div');
-            var titleWrap = document.createElement('div');
-            var title = document.createElement('div');
             var grid = document.createElement('div');
             var checks = document.createElement('div');
 
@@ -436,19 +471,19 @@
                 state.CapabilityProfiles.splice(index, 1);
                 render(page);
             });
+            var row = detailsRow(
+                profile.Name || 'Capability profile',
+                profile.Backend + ' backend',
+                [
+                    profile.Backend,
+                    profile.AllowedVideoCodecs.length + ' video',
+                    profile.AllowedAudioCodecs.length + ' audio',
+                    profile.AllowedContainers.length + ' containers'
+                ],
+                remove);
 
-            panel.className = 'td-panel';
-            panel.dataset.profileId = profile.Id;
-            head.className = 'td-panel-head';
-            title.className = 'td-panel-title';
             grid.className = 'td-field-grid';
             checks.className = 'td-inline-checks';
-
-            title.textContent = 'Profile';
-            titleWrap.appendChild(title);
-            titleWrap.appendChild(chips([profile.Backend, profile.AllowedVideoCodecs.join(', ') || 'Video', profile.AllowedAudioCodecs.join(', ') || 'Audio']));
-            head.appendChild(titleWrap);
-            head.appendChild(remove);
 
             grid.appendChild(field('Name', name, false));
             grid.appendChild(field('Backend', backend, false));
@@ -464,9 +499,8 @@
             checks.appendChild(check('Subtitle burn-in', subtitles));
             checks.appendChild(check('Two pass', twoPass));
 
-            panel.appendChild(head);
-            panel.appendChild(grid);
-            panel.appendChild(checks);
+            row.body.appendChild(grid);
+            row.body.appendChild(checks);
 
             name.addEventListener('input', function () {
                 profile.Name = name.value;
@@ -511,7 +545,7 @@
                 profile.SupportsTwoPass = twoPass.checked;
             });
 
-            body.appendChild(panel);
+            body.appendChild(row.details);
         });
     }
 
@@ -538,10 +572,6 @@
         }
 
         state.Presets.forEach(function (preset, index) {
-            var panel = document.createElement('div');
-            var head = document.createElement('div');
-            var titleWrap = document.createElement('div');
-            var title = document.createElement('div');
             var grid = document.createElement('div');
             var checks = document.createElement('div');
             var name = input('text', preset.Name);
@@ -571,23 +601,19 @@
                 renderPresets(page);
                 updateSummary(page);
             });
+            var row = detailsRow(
+                preset.Name || 'Transcode preset',
+                profileName(preset.CapabilityProfileId) + ' · ' + preset.Container + ' · ' + presetResolution(preset) + ' · ' + presetBitrate(preset),
+                [
+                    preset.Enabled ? 'Enabled' : 'Disabled',
+                    preset.Container,
+                    preset.IsAudioOnlyPreset ? 'Audio' : preset.VideoCodec,
+                    preset.IsAudioOnlyPreset ? preset.AudioCodec : presetResolution(preset)
+                ],
+                remove);
 
-            panel.className = 'td-panel';
-            head.className = 'td-panel-head';
-            title.className = 'td-panel-title';
             grid.className = 'td-field-grid';
             checks.className = 'td-inline-checks';
-
-            title.textContent = preset.Enabled ? 'Enabled preset' : 'Disabled preset';
-            titleWrap.appendChild(title);
-            titleWrap.appendChild(chips([
-                profileName(preset.CapabilityProfileId),
-                preset.Container,
-                presetResolution(preset),
-                presetBitrate(preset)
-            ]));
-            head.appendChild(titleWrap);
-            head.appendChild(remove);
 
             grid.appendChild(field('Name', name, true));
             grid.appendChild(field('Profile', profile, false));
@@ -605,9 +631,8 @@
             checks.appendChild(check('Tone map HDR to SDR', toneMap));
             checks.appendChild(check('Preserve original audio', preserveAudio));
 
-            panel.appendChild(head);
-            panel.appendChild(grid);
-            panel.appendChild(checks);
+            row.body.appendChild(grid);
+            row.body.appendChild(checks);
 
             name.addEventListener('input', function () {
                 preset.Name = name.value;
@@ -676,7 +701,7 @@
                 preset.PreserveOriginalAudioIfCompatible = preserveAudio.checked;
             });
 
-            body.appendChild(panel);
+            body.appendChild(row.details);
         });
     }
 

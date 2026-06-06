@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-version="${VERSION:-0.3.1.0}"
+version="${VERSION:-0.3.2.0}"
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 package_path="${repo_root}/dist/Jellyfin.Plugin.TranscodedDownloads_${version}.zip"
 repository_package_path="${repo_root}/repository/Jellyfin.Plugin.TranscodedDownloads_${version}.zip"
