@@ -8,7 +8,7 @@ This plugin adds a Jellyfin API and web configuration page for creating download
 
 - Target Jellyfin ABI: `10.11.0.0`
 - Target framework: `.NET 9`
-- Plugin package version: `0.2.0.0`
+- Plugin package version: `0.3.1.0`
 - Plugin ID: `2dff9f1e-7a24-4c58-a1c8-74f4fd5312c8`
 
 ## Features
@@ -37,7 +37,7 @@ In Jellyfin, go to Dashboard -> Plugins -> Repositories, add the URL above, then
 The repository manifest points to the checked-in package for the advertised version:
 
 ```text
-https://raw.githubusercontent.com/wivi514/jellyfin-plugin-transcoded-downloads/master/repository/Jellyfin.Plugin.TranscodedDownloads_0.2.0.0.zip
+https://raw.githubusercontent.com/wivi514/jellyfin-plugin-transcoded-downloads/master/repository/Jellyfin.Plugin.TranscodedDownloads_0.3.1.0.zip
 ```
 
 ### Manual Install
@@ -51,7 +51,7 @@ scripts/package-plugin.sh
 The package is written to:
 
 ```text
-dist/Jellyfin.Plugin.TranscodedDownloads_0.2.0.0.zip
+dist/Jellyfin.Plugin.TranscodedDownloads_0.3.1.0.zip
 ```
 
 For manual install, extract the package into a Jellyfin plugin folder, then restart Jellyfin. The plugin configuration page should appear in Dashboard -> Plugins as `Transcoded Downloads`.
@@ -155,6 +155,6 @@ git push origin master
 The optional GitHub Actions release workflow can also publish the same package to a versioned release when you push a version tag:
 
 ```bash
-git tag v0.2.0.0
-git push origin master v0.2.0.0
+git tag v0.3.1.0
+git push origin master v0.3.1.0
 ```

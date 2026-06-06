@@ -2,7 +2,7 @@
 set -euo pipefail
 
 configuration="${CONFIGURATION:-Release}"
-version="${VERSION:-0.3.0.0}"
+version="${VERSION:-0.3.1.0}"
 project="Jellyfin.Plugin.TranscodedDownloads.csproj"
 plugin_name="Jellyfin.Plugin.TranscodedDownloads"
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -27,7 +27,7 @@ touch -d "${artifact_timestamp}" \
 cat >"${metadata_path}" <<EOF
 {
   "category": "General",
-  "changelog": "Added popular transcode presets and a simple H.264 bitrate preset builder in the admin configuration UI.",
+  "changelog": "Fixed assembly version metadata so Jellyfin can uninstall and upgrade the plugin reliably.",
   "description": "Adds Jellyfin API and Web UI support for downloading transcoded copies of movies, episodes, and music items using administrator-defined presets.",
   "guid": "2dff9f1e-7a24-4c58-a1c8-74f4fd5312c8",
   "name": "Transcoded Downloads",

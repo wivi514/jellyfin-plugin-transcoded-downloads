@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-version="${VERSION:-0.3.0.0}"
+version="${VERSION:-0.3.1.0}"
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 package_path="${repo_root}/dist/Jellyfin.Plugin.TranscodedDownloads_${version}.zip"
 repository_package_path="${repo_root}/repository/Jellyfin.Plugin.TranscodedDownloads_${version}.zip"
 manifest_path="${repo_root}/manifest.json"
+project_path="${repo_root}/Jellyfin.Plugin.TranscodedDownloads.csproj"
+assembly_info_path="${repo_root}/Properties/AssemblyInfo.cs"
 
 if ! command -v jq >/dev/null 2>&1; then
     printf 'jq is required to validate %s\n' "${manifest_path}" >&2
@@ -34,6 +36,39 @@ dist_checksum="$(md5sum "${package_path}" | awk '{print tolower($1)}')"
 metadata="$(unzip -p "${repository_package_path}" meta.json)"
 metadata_version="$(jq -r '.version' <<<"${metadata}")"
 metadata_guid="$(jq -r '.guid' <<<"${metadata}")"
+project_version="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' "${project_path}" | head -n 1)"
+project_assembly_version="$(sed -n 's:.*<AssemblyVersion>\(.*\)</AssemblyVersion>.*:\1:p' "${project_path}" | head -n 1)"
+project_file_version="$(sed -n 's:.*<FileVersion>\(.*\)</FileVersion>.*:\1:p' "${project_path}" | head -n 1)"
+
+if [ "${project_version}" != "${version}" ]; then
+    printf 'Project version mismatch: expected %s, found %s\n' "${version}" "${project_version}" >&2
+    exit 1
+fi
+
+if [ "${project_assembly_version}" != "${version}" ]; then
+    printf 'Project AssemblyVersion mismatch: expected %s, found %s\n' "${version}" "${project_assembly_version}" >&2
+    exit 1
+fi
+
+if [ "${project_file_version}" != "${version}" ]; then
+    printf 'Project FileVersion mismatch: expected %s, found %s\n' "${version}" "${project_file_version}" >&2
+    exit 1
+fi
+
+if ! grep -Fq "[assembly: AssemblyVersion(\"${version}\")]" "${assembly_info_path}"; then
+    printf 'AssemblyInfo.cs AssemblyVersion does not match %s.\n' "${version}" >&2
+    exit 1
+fi
+
+if ! grep -Fq "[assembly: AssemblyFileVersion(\"${version}\")]" "${assembly_info_path}"; then
+    printf 'AssemblyInfo.cs AssemblyFileVersion does not match %s.\n' "${version}" >&2
+    exit 1
+fi
+
+if ! grep -Fq "[assembly: AssemblyInformationalVersion(\"${version}\")]" "${assembly_info_path}"; then
+    printf 'AssemblyInfo.cs AssemblyInformationalVersion does not match %s.\n' "${version}" >&2
+    exit 1
+fi
 
 if [ "${manifest_version}" != "${version}" ]; then
     printf 'Manifest version mismatch: expected %s, found %s\n' "${version}" "${manifest_version}" >&2
