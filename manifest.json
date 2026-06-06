@@ -11,9 +11,9 @@
         "version": "0.2.0.0",
         "changelog": "Updated the plugin target to Jellyfin 10.11 and added an admin configuration UI.",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/wivi514/jellyfin-plugin-transcoded-downloads/releases/download/v0.2.0.0/Jellyfin.Plugin.TranscodedDownloads_0.2.0.0.zip",
+        "sourceUrl": "https://raw.githubusercontent.com/wivi514/jellyfin-plugin-transcoded-downloads/master/repository/Jellyfin.Plugin.TranscodedDownloads_0.2.0.0.zip",
         "timestamp": "2026-06-05T00:00:00Z",
-        "checksum": "E48873739EFFCFF3F5741E1B847A0BFB"
+        "checksum": "4a05c7819f90cf8fa97b1d72dd40e209"
       }
     ]
   }

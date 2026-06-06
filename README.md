@@ -34,10 +34,10 @@ https://raw.githubusercontent.com/wivi514/jellyfin-plugin-transcoded-downloads/m
 
 In Jellyfin, go to Dashboard -> Plugins -> Repositories, add the URL above, then open Catalog and install `Transcoded Downloads`.
 
-The repository manifest points to the matching GitHub Releases package for the advertised version. For version `0.2.0.0`, the release asset must exist at:
+The repository manifest points to the checked-in package for the advertised version:
 
 ```text
-https://github.com/wivi514/jellyfin-plugin-transcoded-downloads/releases/download/v0.2.0.0/Jellyfin.Plugin.TranscodedDownloads_0.2.0.0.zip
+https://raw.githubusercontent.com/wivi514/jellyfin-plugin-transcoded-downloads/master/repository/Jellyfin.Plugin.TranscodedDownloads_0.2.0.0.zip
 ```
 
 ### Manual Install
@@ -132,13 +132,13 @@ Required tools for the smoke test:
 
 ## Packaging Manifest
 
-`manifest.json` advertises the release package and MD5 checksum. After changing plugin binaries or embedded resources, rebuild the package and update the checksum:
+`manifest.json` advertises the repository package and MD5 checksum. After changing plugin binaries or embedded resources, rebuild the package and update the checksum:
 
 ```bash
 scripts/package-plugin.sh
 ```
 
-The script prints the MD5 to copy into `manifest.json`.
+The script writes the package to `dist/`, copies it into `repository/`, and prints the MD5 to copy into `manifest.json`.
 
 Validate the local package against the Jellyfin repository manifest:
 
@@ -146,11 +146,15 @@ Validate the local package against the Jellyfin repository manifest:
 scripts/validate-plugin-repository.sh
 ```
 
-To publish an installable release, commit the matching `manifest.json`, then push a version tag:
+To publish an installable repository update, commit the matching `manifest.json` and `repository/` package, then push `master`:
+
+```bash
+git push origin master
+```
+
+The optional GitHub Actions release workflow can also publish the same package to a versioned release when you push a version tag:
 
 ```bash
 git tag v0.2.0.0
 git push origin master v0.2.0.0
 ```
-
-The GitHub Actions release workflow builds the package, validates the manifest, and uploads the zip to the release URL used by Jellyfin.
