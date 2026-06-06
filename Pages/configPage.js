@@ -226,6 +226,41 @@
         return input('checkbox', value, '');
     }
 
+    function field(label, element, wide) {
+        var container = document.createElement('div');
+        var labelElement = document.createElement('label');
+
+        container.className = 'inputContainer' + (wide ? ' td-field-wide' : '');
+        labelElement.className = 'inputLabel inputLabelUnfocused';
+        labelElement.textContent = label;
+        container.appendChild(labelElement);
+        container.appendChild(element);
+        return container;
+    }
+
+    function check(label, element) {
+        var container = document.createElement('label');
+        var text = document.createElement('span');
+
+        container.className = 'td-check';
+        text.textContent = label;
+        container.appendChild(element);
+        container.appendChild(text);
+        return container;
+    }
+
+    function chips(values) {
+        var row = document.createElement('div');
+        row.className = 'td-chip-row';
+        ensureArray(values).forEach(function (value) {
+            var chip = document.createElement('span');
+            chip.className = 'td-chip';
+            chip.textContent = value;
+            row.appendChild(chip);
+        });
+        return row;
+    }
+
     function selectedValues(element) {
         return Array.prototype.map.call(element.selectedOptions, function (selected) {
             return selected.value;
@@ -236,19 +271,93 @@
         var button = document.createElement('button');
         button.type = 'button';
         button.className = 'emby-button td-icon-button';
-        button.textContent = 'X';
         button.title = 'Remove';
+        button.innerHTML = '<span class="material-icons" aria-hidden="true">delete</span>';
         button.addEventListener('click', onClick);
         return button;
+    }
+
+    function profileName(profileId) {
+        var profile = state.CapabilityProfiles.filter(function (candidate) {
+            return candidate.Id === profileId;
+        })[0];
+
+        return profile ? profile.Name || profile.Id : profileId;
+    }
+
+    function presetResolution(preset) {
+        if (preset.IsAudioOnlyPreset) {
+            return 'Audio';
+        }
+
+        if (preset.MaxWidth && preset.MaxHeight) {
+            return preset.MaxWidth + 'x' + preset.MaxHeight;
+        }
+
+        return 'Original';
+    }
+
+    function presetBitrate(preset) {
+        var parts = [];
+        if (preset.VideoBitrateKbps && !preset.IsAudioOnlyPreset) {
+            parts.push(preset.VideoBitrateKbps + ' video');
+        }
+
+        if (preset.AudioBitrateKbps) {
+            parts.push(preset.AudioBitrateKbps + ' audio');
+        }
+
+        return parts.length ? parts.join(' / ') : 'Auto';
+    }
+
+    function syncGeneral(page) {
+        if (!state) {
+            return;
+        }
+
+        state.EnableVideoDownloads = qs(page, '#td-enable-video').checked;
+        state.EnableMusicDownloads = qs(page, '#td-enable-music').checked;
+        state.EnableWebUiInjection = qs(page, '#td-enable-web-ui').checked;
+        state.EnableAdvancedUnsafeFfmpegArguments = qs(page, '#td-enable-advanced-ffmpeg').checked;
+        state.TempDirectory = qs(page, '#td-temp-directory').value.trim();
+        state.MaxConcurrentJobs = positiveInt(qs(page, '#td-max-concurrent').value, 1);
+        state.MaxQueueSize = positiveInt(qs(page, '#td-max-queue').value, 10);
+        state.JobRetentionHours = positiveInt(qs(page, '#td-retention-hours').value, 24);
+        state.MaxTempFolderSizeMb = positiveInt(qs(page, '#td-max-temp-size').value, 50000);
+    }
+
+    function updateSummary(page) {
+        if (!state) {
+            return;
+        }
+
+        qs(page, '#td-summary-presets').textContent = state.Presets.filter(function (preset) {
+            return preset.Enabled !== false;
+        }).length + '/' + state.Presets.length;
+        qs(page, '#td-summary-profiles').textContent = state.CapabilityProfiles.length;
+        qs(page, '#td-summary-concurrency').textContent = state.MaxConcurrentJobs;
+        qs(page, '#td-summary-retention').textContent = state.JobRetentionHours + 'h';
     }
 
     function renderProfiles(page) {
         var body = qs(page, '#td-profile-rows');
         body.innerHTML = '';
 
+        if (!state.CapabilityProfiles.length) {
+            var empty = document.createElement('div');
+            empty.className = 'td-empty';
+            empty.textContent = 'No capability profiles configured.';
+            body.appendChild(empty);
+            return;
+        }
+
         state.CapabilityProfiles.forEach(function (profile, index) {
-            var row = document.createElement('tr');
-            row.dataset.profileId = profile.Id;
+            var panel = document.createElement('div');
+            var head = document.createElement('div');
+            var titleWrap = document.createElement('div');
+            var title = document.createElement('div');
+            var grid = document.createElement('div');
+            var checks = document.createElement('div');
 
             var name = input('text', profile.Name);
             var backend = select(backends, profile.Backend, false);
@@ -256,56 +365,90 @@
             var profileAudio = select(audioCodecs, profile.AllowedAudioCodecs, true);
             var profileContainers = select(containers, profile.AllowedContainers, true);
             var device = input('text', profile.DevicePath);
+            var notes = input('text', profile.Notes);
+            var hardwareDecode = checkbox(profile.SupportsHardwareDecode);
+            var hardwareEncode = checkbox(profile.SupportsHardwareEncode);
             var toneMap = checkbox(profile.SupportsToneMapping);
             var subtitles = checkbox(profile.SupportsSubtitleBurnIn);
+            var twoPass = checkbox(profile.SupportsTwoPass);
+            var remove = removeButton(function () {
+                if (state.CapabilityProfiles.length === 1) {
+                    return;
+                }
 
-            [
-                name,
-                backend,
-                profileVideo,
-                profileAudio,
-                profileContainers,
-                device,
-                toneMap,
-                subtitles,
-                removeButton(function () {
-                    if (state.CapabilityProfiles.length === 1) {
-                        return;
+                var replacementId = state.CapabilityProfiles[index === 0 ? 1 : 0].Id;
+                state.Presets.forEach(function (preset) {
+                    if (preset.CapabilityProfileId === profile.Id) {
+                        preset.CapabilityProfileId = replacementId;
                     }
-
-                    var replacementId = state.CapabilityProfiles[index === 0 ? 1 : 0].Id;
-                    state.Presets.forEach(function (preset) {
-                        if (preset.CapabilityProfileId === profile.Id) {
-                            preset.CapabilityProfileId = replacementId;
-                        }
-                    });
-                    state.CapabilityProfiles.splice(index, 1);
-                    render(page);
-                })
-            ].forEach(function (element) {
-                var cell = document.createElement('td');
-                cell.appendChild(element);
-                row.appendChild(cell);
+                });
+                state.CapabilityProfiles.splice(index, 1);
+                render(page);
             });
+
+            panel.className = 'td-panel';
+            panel.dataset.profileId = profile.Id;
+            head.className = 'td-panel-head';
+            title.className = 'td-panel-title';
+            grid.className = 'td-field-grid';
+            checks.className = 'td-inline-checks';
+
+            title.textContent = 'Profile';
+            titleWrap.appendChild(title);
+            titleWrap.appendChild(chips([profile.Backend, profile.AllowedVideoCodecs.join(', ') || 'Video', profile.AllowedAudioCodecs.join(', ') || 'Audio']));
+            head.appendChild(titleWrap);
+            head.appendChild(remove);
+
+            grid.appendChild(field('Name', name, false));
+            grid.appendChild(field('Backend', backend, false));
+            grid.appendChild(field('Video codecs', profileVideo, false));
+            grid.appendChild(field('Audio codecs', profileAudio, false));
+            grid.appendChild(field('Containers', profileContainers, false));
+            grid.appendChild(field('Device path', device, false));
+            grid.appendChild(field('Notes', notes, true));
+
+            checks.appendChild(check('Hardware decode', hardwareDecode));
+            checks.appendChild(check('Hardware encode', hardwareEncode));
+            checks.appendChild(check('Tone mapping', toneMap));
+            checks.appendChild(check('Subtitle burn-in', subtitles));
+            checks.appendChild(check('Two pass', twoPass));
+
+            panel.appendChild(head);
+            panel.appendChild(grid);
+            panel.appendChild(checks);
 
             name.addEventListener('input', function () {
                 profile.Name = name.value;
                 renderPresets(page);
+                updateSummary(page);
             });
             backend.addEventListener('change', function () {
                 profile.Backend = backend.value;
+                renderProfiles(page);
             });
             profileVideo.addEventListener('change', function () {
                 profile.AllowedVideoCodecs = selectedValues(profileVideo);
+                renderProfiles(page);
             });
             profileAudio.addEventListener('change', function () {
                 profile.AllowedAudioCodecs = selectedValues(profileAudio);
+                renderProfiles(page);
             });
             profileContainers.addEventListener('change', function () {
                 profile.AllowedContainers = selectedValues(profileContainers);
+                renderProfiles(page);
             });
             device.addEventListener('input', function () {
                 profile.DevicePath = device.value;
+            });
+            notes.addEventListener('input', function () {
+                profile.Notes = notes.value;
+            });
+            hardwareDecode.addEventListener('change', function () {
+                profile.SupportsHardwareDecode = hardwareDecode.checked;
+            });
+            hardwareEncode.addEventListener('change', function () {
+                profile.SupportsHardwareEncode = hardwareEncode.checked;
             });
             toneMap.addEventListener('change', function () {
                 profile.SupportsToneMapping = toneMap.checked;
@@ -313,8 +456,11 @@
             subtitles.addEventListener('change', function () {
                 profile.SupportsSubtitleBurnIn = subtitles.checked;
             });
+            twoPass.addEventListener('change', function () {
+                profile.SupportsTwoPass = twoPass.checked;
+            });
 
-            body.appendChild(row);
+            body.appendChild(panel);
         });
     }
 
@@ -332,8 +478,21 @@
         var body = qs(page, '#td-preset-rows');
         body.innerHTML = '';
 
+        if (!state.Presets.length) {
+            var empty = document.createElement('div');
+            empty.className = 'td-empty';
+            empty.textContent = 'No presets configured.';
+            body.appendChild(empty);
+            return;
+        }
+
         state.Presets.forEach(function (preset, index) {
-            var row = document.createElement('tr');
+            var panel = document.createElement('div');
+            var head = document.createElement('div');
+            var titleWrap = document.createElement('div');
+            var title = document.createElement('div');
+            var grid = document.createElement('div');
+            var checks = document.createElement('div');
             var name = input('text', preset.Name);
             var profile = document.createElement('select');
             profile.className = 'emby-select-withcolor emby-select';
@@ -345,44 +504,78 @@
             var audio = select(audioCodecs, preset.AudioCodec, false);
             var size = input('text', [preset.MaxWidth || '', preset.MaxHeight || ''].join('x'));
             var bitrate = input('text', [preset.VideoBitrateKbps || '', preset.AudioBitrateKbps || ''].join('/'));
+            var audioChannels = input('number', preset.AudioChannels);
             var enabled = checkbox(preset.Enabled);
+            var streamCopy = checkbox(preset.AllowStreamCopyWhenCompatible);
+            var burnSubtitles = checkbox(preset.BurnSubtitles);
+            var toneMap = checkbox(preset.ToneMapHdrToSdr);
+            var preserveAudio = checkbox(preset.PreserveOriginalAudioIfCompatible);
+            var audioOnly = checkbox(preset.IsAudioOnlyPreset);
+            var remove = removeButton(function () {
+                if (state.Presets.length === 1) {
+                    return;
+                }
 
-            [
-                name,
-                profile,
-                container,
-                video,
-                audio,
-                size,
-                bitrate,
-                enabled,
-                removeButton(function () {
-                    if (state.Presets.length === 1) {
-                        return;
-                    }
-
-                    state.Presets.splice(index, 1);
-                    renderPresets(page);
-                })
-            ].forEach(function (element) {
-                var cell = document.createElement('td');
-                cell.appendChild(element);
-                row.appendChild(cell);
+                state.Presets.splice(index, 1);
+                renderPresets(page);
+                updateSummary(page);
             });
+
+            panel.className = 'td-panel';
+            head.className = 'td-panel-head';
+            title.className = 'td-panel-title';
+            grid.className = 'td-field-grid';
+            checks.className = 'td-inline-checks';
+
+            title.textContent = preset.Enabled ? 'Enabled preset' : 'Disabled preset';
+            titleWrap.appendChild(title);
+            titleWrap.appendChild(chips([
+                profileName(preset.CapabilityProfileId),
+                preset.Container,
+                presetResolution(preset),
+                presetBitrate(preset)
+            ]));
+            head.appendChild(titleWrap);
+            head.appendChild(remove);
+
+            grid.appendChild(field('Name', name, true));
+            grid.appendChild(field('Profile', profile, false));
+            grid.appendChild(field('Container', container, false));
+            grid.appendChild(field('Video codec', video, false));
+            grid.appendChild(field('Audio codec', audio, false));
+            grid.appendChild(field('Size, WxH', size, false));
+            grid.appendChild(field('Bitrate, video/audio', bitrate, false));
+            grid.appendChild(field('Audio channels', audioChannels, false));
+
+            checks.appendChild(check('Enabled', enabled));
+            checks.appendChild(check('Audio only', audioOnly));
+            checks.appendChild(check('Stream copy when compatible', streamCopy));
+            checks.appendChild(check('Burn subtitles', burnSubtitles));
+            checks.appendChild(check('Tone map HDR to SDR', toneMap));
+            checks.appendChild(check('Preserve original audio', preserveAudio));
+
+            panel.appendChild(head);
+            panel.appendChild(grid);
+            panel.appendChild(checks);
 
             name.addEventListener('input', function () {
                 preset.Name = name.value;
             });
             profile.addEventListener('change', function () {
                 preset.CapabilityProfileId = profile.value;
+                renderPresets(page);
             });
             container.addEventListener('change', function () {
                 preset.Container = container.value;
+                preset.IsAudioOnlyPreset = video.value === 'Copy' && (preset.Container === 'Mp3' || preset.Container === 'M4a' || preset.Container === 'Ogg' || preset.Container === 'Flac');
+                preset.IsVideoPreset = !preset.IsAudioOnlyPreset;
+                renderPresets(page);
             });
             video.addEventListener('change', function () {
                 preset.VideoCodec = video.value;
                 preset.IsAudioOnlyPreset = video.value === 'Copy' && (preset.Container === 'Mp3' || preset.Container === 'M4a' || preset.Container === 'Ogg' || preset.Container === 'Flac');
                 preset.IsVideoPreset = !preset.IsAudioOnlyPreset;
+                renderPresets(page);
             });
             audio.addEventListener('change', function () {
                 preset.AudioCodec = audio.value;
@@ -397,11 +590,42 @@
                 preset.VideoBitrateKbps = optionalPositiveInt(parts[0]);
                 preset.AudioBitrateKbps = optionalPositiveInt(parts[1]);
             });
+            audioChannels.addEventListener('input', function () {
+                preset.AudioChannels = optionalPositiveInt(audioChannels.value);
+            });
             enabled.addEventListener('change', function () {
                 preset.Enabled = enabled.checked;
+                renderPresets(page);
+                updateSummary(page);
+            });
+            audioOnly.addEventListener('change', function () {
+                preset.IsAudioOnlyPreset = audioOnly.checked;
+                preset.IsVideoPreset = !audioOnly.checked;
+                if (audioOnly.checked) {
+                    preset.VideoCodec = 'Copy';
+                    preset.MaxWidth = null;
+                    preset.MaxHeight = null;
+                    preset.VideoBitrateKbps = null;
+                    preset.BurnSubtitles = false;
+                    preset.ToneMapHdrToSdr = false;
+                }
+
+                renderPresets(page);
+            });
+            streamCopy.addEventListener('change', function () {
+                preset.AllowStreamCopyWhenCompatible = streamCopy.checked;
+            });
+            burnSubtitles.addEventListener('change', function () {
+                preset.BurnSubtitles = burnSubtitles.checked;
+            });
+            toneMap.addEventListener('change', function () {
+                preset.ToneMapHdrToSdr = toneMap.checked;
+            });
+            preserveAudio.addEventListener('change', function () {
+                preset.PreserveOriginalAudioIfCompatible = preserveAudio.checked;
             });
 
-            body.appendChild(row);
+            body.appendChild(panel);
         });
     }
 
@@ -417,18 +641,11 @@
         qs(page, '#td-max-temp-size').value = state.MaxTempFolderSizeMb;
         renderProfiles(page);
         renderPresets(page);
+        updateSummary(page);
     }
 
     function collect(page) {
-        state.EnableVideoDownloads = qs(page, '#td-enable-video').checked;
-        state.EnableMusicDownloads = qs(page, '#td-enable-music').checked;
-        state.EnableWebUiInjection = qs(page, '#td-enable-web-ui').checked;
-        state.EnableAdvancedUnsafeFfmpegArguments = qs(page, '#td-enable-advanced-ffmpeg').checked;
-        state.TempDirectory = qs(page, '#td-temp-directory').value.trim();
-        state.MaxConcurrentJobs = positiveInt(qs(page, '#td-max-concurrent').value, 1);
-        state.MaxQueueSize = positiveInt(qs(page, '#td-max-queue').value, 10);
-        state.JobRetentionHours = positiveInt(qs(page, '#td-retention-hours').value, 24);
-        state.MaxTempFolderSizeMb = positiveInt(qs(page, '#td-max-temp-size').value, 50000);
+        syncGeneral(page);
 
         state.CapabilityProfiles.forEach(function (profile) {
             if (!profile.AllowedVideoCodecs.length) {
@@ -464,6 +681,27 @@
     }
 
     function bind(page) {
+        [
+            '#td-enable-video',
+            '#td-enable-music',
+            '#td-enable-web-ui',
+            '#td-enable-advanced-ffmpeg',
+            '#td-temp-directory',
+            '#td-max-concurrent',
+            '#td-max-queue',
+            '#td-retention-hours',
+            '#td-max-temp-size'
+        ].forEach(function (selector) {
+            qs(page, selector).addEventListener('input', function () {
+                syncGeneral(page);
+                updateSummary(page);
+            });
+            qs(page, selector).addEventListener('change', function () {
+                syncGeneral(page);
+                updateSummary(page);
+            });
+        });
+
         qs(page, '#td-add-profile').addEventListener('click', function () {
             var profile = defaultProfile();
             profile.Id = id();
@@ -475,6 +713,7 @@
         qs(page, '#td-add-preset').addEventListener('click', function () {
             state.Presets.push(addedDefaultPreset(state.CapabilityProfiles[0].Id));
             renderPresets(page);
+            updateSummary(page);
         });
 
         qs(page, '#td-reset-defaults').addEventListener('click', function () {

@@ -3,61 +3,183 @@
 <head>
     <title>Transcoded Downloads</title>
     <style>
-        .transcodedDownloadsPage .td-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
-            gap: 1rem;
-            margin: 1rem 0;
+        .transcodedDownloadsPage {
+            --td-gap: 1rem;
+            --td-border: rgba(255,255,255,.12);
+            --td-muted: rgba(255,255,255,.68);
+            --td-panel: rgba(255,255,255,.045);
         }
 
-        .transcodedDownloadsPage .td-row {
-            align-items: center;
+        .transcodedDownloadsPage .td-header {
+            align-items: flex-start;
             display: flex;
-            gap: .75rem;
+            gap: 1rem;
             justify-content: space-between;
-            min-height: 2.5rem;
+            margin: 0 0 1.25rem;
         }
 
-        .transcodedDownloadsPage .td-row label {
+        .transcodedDownloadsPage .td-title {
             margin: 0;
         }
 
-        .transcodedDownloadsPage .td-toolbar {
+        .transcodedDownloadsPage .td-actions {
             align-items: center;
             display: flex;
             flex-wrap: wrap;
             gap: .75rem;
-            margin: 1rem 0;
+            justify-content: flex-end;
         }
 
-        .transcodedDownloadsPage .td-table-wrap {
-            overflow-x: auto;
+        .transcodedDownloadsPage .td-status {
+            color: var(--td-muted);
+            min-height: 1.5rem;
         }
 
-        .transcodedDownloadsPage table {
-            border-collapse: collapse;
-            min-width: 62rem;
-            width: 100%;
+        .transcodedDownloadsPage .td-summary {
+            display: grid;
+            gap: .75rem;
+            grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+            margin: 0 0 1.25rem;
         }
 
-        .transcodedDownloadsPage th,
-        .transcodedDownloadsPage td {
-            padding: .45rem;
-            text-align: left;
-            vertical-align: middle;
+        .transcodedDownloadsPage .td-metric {
+            border: 1px solid var(--td-border);
+            border-radius: 8px;
+            padding: .85rem 1rem;
         }
 
-        .transcodedDownloadsPage th {
-            font-size: .9rem;
+        .transcodedDownloadsPage .td-metric-value {
+            display: block;
+            font-size: 1.35rem;
             font-weight: 600;
+            line-height: 1.2;
         }
 
-        .transcodedDownloadsPage .td-cell-sm {
-            width: 5rem;
+        .transcodedDownloadsPage .td-metric-label {
+            color: var(--td-muted);
+            display: block;
+            font-size: .84rem;
+            margin-top: .2rem;
         }
 
-        .transcodedDownloadsPage .td-cell-md {
-            width: 8rem;
+        .transcodedDownloadsPage .td-section {
+            border-top: 1px solid var(--td-border);
+            margin-top: 1.5rem;
+            padding-top: 1.25rem;
+        }
+
+        .transcodedDownloadsPage .td-section-head {
+            align-items: center;
+            display: flex;
+            gap: 1rem;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .transcodedDownloadsPage .td-section-head .sectionTitle {
+            margin: 0;
+        }
+
+        .transcodedDownloadsPage .td-settings-grid,
+        .transcodedDownloadsPage .td-editor-grid {
+            display: grid;
+            gap: var(--td-gap);
+            grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+        }
+
+        .transcodedDownloadsPage .td-toggle-list {
+            display: grid;
+            gap: .5rem;
+        }
+
+        .transcodedDownloadsPage .td-toggle-row {
+            align-items: center;
+            border: 1px solid var(--td-border);
+            border-radius: 8px;
+            display: flex;
+            gap: .75rem;
+            justify-content: space-between;
+            min-height: 2.75rem;
+            padding: .55rem .75rem;
+        }
+
+        .transcodedDownloadsPage .td-toggle-row label {
+            margin: 0;
+        }
+
+        .transcodedDownloadsPage .td-panel-list {
+            display: grid;
+            gap: var(--td-gap);
+        }
+
+        .transcodedDownloadsPage .td-panel {
+            border: 1px solid var(--td-border);
+            border-radius: 8px;
+            background: var(--td-panel);
+            padding: 1rem;
+        }
+
+        .transcodedDownloadsPage .td-panel-head {
+            align-items: flex-start;
+            display: grid;
+            gap: .75rem;
+            grid-template-columns: minmax(0, 1fr) auto;
+            margin-bottom: 1rem;
+        }
+
+        .transcodedDownloadsPage .td-panel-title {
+            color: var(--td-muted);
+            font-size: .82rem;
+            margin-bottom: .35rem;
+        }
+
+        .transcodedDownloadsPage .td-field-grid {
+            display: grid;
+            gap: .75rem;
+            grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+        }
+
+        .transcodedDownloadsPage .td-field-wide {
+            grid-column: 1 / -1;
+        }
+
+        .transcodedDownloadsPage .td-chip-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .4rem;
+            margin-top: .6rem;
+        }
+
+        .transcodedDownloadsPage .td-chip {
+            border: 1px solid var(--td-border);
+            border-radius: 999px;
+            color: var(--td-muted);
+            display: inline-flex;
+            font-size: .78rem;
+            line-height: 1;
+            padding: .35rem .55rem;
+        }
+
+        .transcodedDownloadsPage .td-inline-checks {
+            display: grid;
+            gap: .5rem;
+            grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+            margin-top: .75rem;
+        }
+
+        .transcodedDownloadsPage .td-check {
+            align-items: center;
+            border: 1px solid var(--td-border);
+            border-radius: 8px;
+            display: flex;
+            gap: .55rem;
+            min-height: 2.4rem;
+            padding: .4rem .6rem;
+        }
+
+        .transcodedDownloadsPage .td-check span {
+            color: var(--td-muted);
+            font-size: .88rem;
         }
 
         .transcodedDownloadsPage .td-icon-button {
@@ -65,8 +187,22 @@
             width: 2.6rem;
         }
 
-        .transcodedDownloadsPage .td-status {
-            min-height: 1.5rem;
+        .transcodedDownloadsPage .td-empty {
+            border: 1px dashed var(--td-border);
+            border-radius: 8px;
+            color: var(--td-muted);
+            padding: 1rem;
+        }
+
+        @media (max-width: 43rem) {
+            .transcodedDownloadsPage .td-header,
+            .transcodedDownloadsPage .td-section-head {
+                display: grid;
+            }
+
+            .transcodedDownloadsPage .td-actions {
+                justify-content: flex-start;
+            }
         }
     </style>
 </head>
@@ -75,44 +211,71 @@
         <div data-role="content">
             <div class="content-primary">
                 <form id="transcoded-downloads-config-form">
-                    <div class="sectionTitleContainer flex align-items-center">
-                        <h2 class="sectionTitle">Transcoded Downloads</h2>
+                    <div class="td-header">
+                        <div>
+                            <h2 class="sectionTitle td-title">Transcoded Downloads</h2>
+                            <div id="td-status" class="td-status"></div>
+                        </div>
+                        <div class="td-actions">
+                            <button type="submit" is="emby-button" class="raised button-submit">
+                                <span class="material-icons" aria-hidden="true">save</span>
+                                <span>Save</span>
+                            </button>
+                            <button id="td-reset-defaults" type="button" is="emby-button" class="raised">
+                                <span class="material-icons" aria-hidden="true">restart_alt</span>
+                                <span>Reset</span>
+                            </button>
+                        </div>
                     </div>
 
-                    <div class="td-grid">
-                        <div class="paperList">
-                            <div class="td-row">
-                                <label for="td-enable-video">Video downloads</label>
-                                <label class="emby-checkbox-label">
-                                    <input id="td-enable-video" type="checkbox" is="emby-checkbox" />
-                                </label>
-                            </div>
-                            <div class="td-row">
-                                <label for="td-enable-music">Music downloads</label>
-                                <label class="emby-checkbox-label">
-                                    <input id="td-enable-music" type="checkbox" is="emby-checkbox" />
-                                </label>
-                            </div>
-                            <div class="td-row">
-                                <label for="td-enable-web-ui">Web item button</label>
-                                <label class="emby-checkbox-label">
-                                    <input id="td-enable-web-ui" type="checkbox" is="emby-checkbox" />
-                                </label>
-                            </div>
-                            <div class="td-row">
-                                <label for="td-enable-advanced-ffmpeg">Advanced FFmpeg arguments</label>
-                                <label class="emby-checkbox-label">
-                                    <input id="td-enable-advanced-ffmpeg" type="checkbox" is="emby-checkbox" />
-                                </label>
-                            </div>
+                    <div class="td-summary">
+                        <div class="td-metric">
+                            <span id="td-summary-presets" class="td-metric-value">0</span>
+                            <span class="td-metric-label">Presets</span>
                         </div>
+                        <div class="td-metric">
+                            <span id="td-summary-profiles" class="td-metric-value">0</span>
+                            <span class="td-metric-label">Profiles</span>
+                        </div>
+                        <div class="td-metric">
+                            <span id="td-summary-concurrency" class="td-metric-value">1</span>
+                            <span class="td-metric-label">Concurrent jobs</span>
+                        </div>
+                        <div class="td-metric">
+                            <span id="td-summary-retention" class="td-metric-value">24h</span>
+                            <span class="td-metric-label">Retention</span>
+                        </div>
+                    </div>
 
-                        <div class="paperList">
-                            <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="td-temp-directory">Temporary directory</label>
-                                <input id="td-temp-directory" type="text" is="emby-input" />
+                    <div class="td-section">
+                        <div class="td-section-head">
+                            <h3 class="sectionTitle">General</h3>
+                        </div>
+                        <div class="td-settings-grid">
+                            <div class="td-toggle-list">
+                                <div class="td-toggle-row">
+                                    <label for="td-enable-video">Video downloads</label>
+                                    <input id="td-enable-video" type="checkbox" is="emby-checkbox" />
+                                </div>
+                                <div class="td-toggle-row">
+                                    <label for="td-enable-music">Music downloads</label>
+                                    <input id="td-enable-music" type="checkbox" is="emby-checkbox" />
+                                </div>
+                                <div class="td-toggle-row">
+                                    <label for="td-enable-web-ui">Web item button</label>
+                                    <input id="td-enable-web-ui" type="checkbox" is="emby-checkbox" />
+                                </div>
+                                <div class="td-toggle-row">
+                                    <label for="td-enable-advanced-ffmpeg">Advanced FFmpeg arguments</label>
+                                    <input id="td-enable-advanced-ffmpeg" type="checkbox" is="emby-checkbox" />
+                                </div>
                             </div>
-                            <div class="td-grid">
+
+                            <div class="td-editor-grid">
+                                <div class="inputContainer td-field-wide">
+                                    <label class="inputLabel inputLabelUnfocused" for="td-temp-directory">Temporary directory</label>
+                                    <input id="td-temp-directory" type="text" is="emby-input" />
+                                </div>
                                 <div class="inputContainer">
                                     <label class="inputLabel inputLabelUnfocused" for="td-max-concurrent">Concurrent jobs</label>
                                     <input id="td-max-concurrent" type="number" min="1" step="1" is="emby-input" />
@@ -133,68 +296,26 @@
                         </div>
                     </div>
 
-                    <div class="sectionTitleContainer flex align-items-center">
-                        <h3 class="sectionTitle">Capability Profiles</h3>
-                    </div>
-                    <div class="td-toolbar">
-                        <button id="td-add-profile" type="button" is="emby-button" class="raised button-submit">
-                            <span>Add profile</span>
-                        </button>
-                    </div>
-                    <div class="td-table-wrap">
-                        <table class="paperList">
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Backend</th>
-                                    <th>Video</th>
-                                    <th>Audio</th>
-                                    <th>Containers</th>
-                                    <th>Device</th>
-                                    <th>Tone map</th>
-                                    <th>Subtitles</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody id="td-profile-rows"></tbody>
-                        </table>
+                    <div class="td-section">
+                        <div class="td-section-head">
+                            <h3 class="sectionTitle">Capability Profiles</h3>
+                            <button id="td-add-profile" type="button" is="emby-button" class="raised button-submit">
+                                <span class="material-icons" aria-hidden="true">add</span>
+                                <span>Add Profile</span>
+                            </button>
+                        </div>
+                        <div id="td-profile-rows" class="td-panel-list"></div>
                     </div>
 
-                    <div class="sectionTitleContainer flex align-items-center">
-                        <h3 class="sectionTitle">Presets</h3>
-                    </div>
-                    <div class="td-toolbar">
-                        <button id="td-add-preset" type="button" is="emby-button" class="raised button-submit">
-                            <span>Add preset</span>
-                        </button>
-                    </div>
-                    <div class="td-table-wrap">
-                        <table class="paperList">
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Profile</th>
-                                    <th>Container</th>
-                                    <th>Video</th>
-                                    <th>Audio</th>
-                                    <th>Size</th>
-                                    <th>Bitrate</th>
-                                    <th>Enabled</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody id="td-preset-rows"></tbody>
-                        </table>
-                    </div>
-
-                    <div class="td-toolbar">
-                        <button type="submit" is="emby-button" class="raised button-submit">
-                            <span>Save</span>
-                        </button>
-                        <button id="td-reset-defaults" type="button" is="emby-button" class="raised">
-                            <span>Reset defaults</span>
-                        </button>
-                        <div id="td-status" class="td-status"></div>
+                    <div class="td-section">
+                        <div class="td-section-head">
+                            <h3 class="sectionTitle">Presets</h3>
+                            <button id="td-add-preset" type="button" is="emby-button" class="raised button-submit">
+                                <span class="material-icons" aria-hidden="true">add</span>
+                                <span>Add Preset</span>
+                            </button>
+                        </div>
+                        <div id="td-preset-rows" class="td-panel-list"></div>
                     </div>
                 </form>
             </div>
