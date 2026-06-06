@@ -58,6 +58,10 @@
                 });
             }
 
+            if (response.status === 204) {
+                return null;
+            }
+
             return response.json();
         });
     }
@@ -109,6 +113,11 @@
             '.transcoded-downloads-close{appearance:none;border:0;background:transparent;color:inherit;font-size:28px;line-height:1;cursor:pointer;}',
             '.transcoded-downloads-body{padding:12px 22px 22px;}',
             '.transcoded-downloads-select{width:100%;box-sizing:border-box;margin:8px 0 16px;padding:10px;border-radius:4px;border:1px solid rgba(255,255,255,.28);background:#111;color:#fff;}',
+            '.transcoded-downloads-existing{margin:0 0 18px;padding:12px;border:1px solid rgba(255,255,255,.14);border-radius:6px;background:rgba(255,255,255,.05);}',
+            '.transcoded-downloads-existing-title{font-size:.95rem;font-weight:600;margin:0 0 8px;}',
+            '.transcoded-downloads-job-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;margin-top:8px;}',
+            '.transcoded-downloads-job-name{font-size:.9rem;color:rgba(255,255,255,.88);}',
+            '.transcoded-downloads-job-meta{font-size:.8rem;color:rgba(255,255,255,.62);margin-top:2px;}',
             '.transcoded-downloads-status{min-height:1.4em;margin:10px 0 0;color:rgba(255,255,255,.78);}',
             '.transcoded-downloads-actions{display:flex;gap:12px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap;}',
             '.transcoded-downloads-primary,.transcoded-downloads-secondary{border:0;border-radius:4px;padding:10px 16px;cursor:pointer;}',
@@ -198,6 +207,10 @@
         return value[camelName] === undefined ? value[pascalName] : value[camelName];
     }
 
+    function isSameGuid(left, right) {
+        return String(left || '').toLowerCase() === String(right || '').toLowerCase();
+    }
+
     function normalizeStatus(value) {
         if (typeof value === 'string') {
             return jobStatus[value.charAt(0).toLowerCase() + value.slice(1)];
@@ -206,13 +219,137 @@
         return value;
     }
 
-    function renderDialog(presets) {
+    function statusLabel(value) {
+        switch (normalizeStatus(value)) {
+            case jobStatus.queued:
+                return 'Queued';
+            case jobStatus.running:
+                return 'Running';
+            case jobStatus.completed:
+                return 'Ready';
+            case jobStatus.failed:
+                return 'Failed';
+            case jobStatus.cancelled:
+                return 'Cancelled';
+            case jobStatus.expired:
+                return 'Expired';
+            default:
+                return 'Unknown';
+        }
+    }
+
+    function formatBytes(bytes) {
+        var value = Number(bytes);
+        var units = ['B', 'KB', 'MB', 'GB'];
+        var index = 0;
+
+        while (value >= 1024 && index < units.length - 1) {
+            value = value / 1024;
+            index++;
+        }
+
+        return (index === 0 ? value : value.toFixed(1)) + ' ' + units[index];
+    }
+
+    function formatJobMeta(job) {
+        var parts = [statusLabel(getField(job, 'status', 'Status'))];
+        var progress = getField(job, 'progressPercent', 'ProgressPercent');
+        var size = getField(job, 'outputSizeBytes', 'OutputSizeBytes');
+
+        if (normalizeStatus(getField(job, 'status', 'Status')) !== jobStatus.completed && progress) {
+            parts.push(Math.round(progress) + '%');
+        }
+
+        if (size) {
+            parts.push(formatBytes(size));
+        }
+
+        return parts.join(' - ');
+    }
+
+    function getPresetName(presets, presetId) {
+        for (var i = 0; i < presets.length; i++) {
+            if (getField(presets[i], 'id', 'Id') === presetId) {
+                return getField(presets[i], 'name', 'Name');
+            }
+        }
+
+        return presetId;
+    }
+
+    function getItemJobs(jobs) {
+        var itemId = getItemId();
+
+        return (jobs || []).filter(function (job) {
+            return isSameGuid(getField(job, 'itemId', 'ItemId'), itemId);
+        }).sort(function (left, right) {
+            return Date.parse(getField(right, 'createdAt', 'CreatedAt') || 0) - Date.parse(getField(left, 'createdAt', 'CreatedAt') || 0);
+        });
+    }
+
+    function renderExistingJobs(dialog, jobs, presets) {
+        var container = dialog.querySelector('.transcoded-downloads-existing');
+        if (!container) {
+            return;
+        }
+
+        if (!jobs.length) {
+            container.hidden = true;
+            container.innerHTML = '';
+            return;
+        }
+
+        container.hidden = false;
+        container.innerHTML = '<p class="transcoded-downloads-existing-title">Existing jobs</p>';
+
+        jobs.slice(0, 3).forEach(function (job) {
+            var row = document.createElement('div');
+            var action = document.createElement('button');
+            var status = normalizeStatus(getField(job, 'status', 'Status'));
+            var jobId = getField(job, 'id', 'Id');
+
+            row.className = 'transcoded-downloads-job-row';
+            row.innerHTML = [
+                '<div>',
+                '<div class="transcoded-downloads-job-name">' + escapeHtml(getPresetName(presets, getField(job, 'presetId', 'PresetId'))) + '</div>',
+                '<div class="transcoded-downloads-job-meta">' + escapeHtml(formatJobMeta(job)) + '</div>',
+                '</div>'
+            ].join('');
+
+            action.type = 'button';
+            action.className = status === jobStatus.completed ? 'transcoded-downloads-primary' : 'transcoded-downloads-secondary';
+
+            if (status === jobStatus.completed) {
+                action.textContent = 'Download';
+                action.addEventListener('click', function () {
+                    downloadJob(jobId);
+                    removeDialog();
+                });
+            } else if (status === jobStatus.queued || status === jobStatus.running) {
+                action.textContent = 'Resume';
+                action.addEventListener('click', function () {
+                    pollJob(dialog, jobId, 0);
+                });
+            } else {
+                action.textContent = 'Remove';
+                action.addEventListener('click', function () {
+                    deleteJob(dialog, jobId, presets);
+                });
+            }
+
+            row.appendChild(action);
+            container.appendChild(row);
+        });
+    }
+
+    function renderDialog(presets, jobs) {
         removeDialog();
         ensureStyles();
 
         var backdrop = document.createElement('div');
         backdrop.id = plugin.dialogId;
         backdrop.className = 'transcoded-downloads-modal-backdrop';
+        backdrop.transcodedDownloadsPresets = presets;
 
         var options = presets.map(function (preset) {
             return '<option value="' + encodeURIComponent(getField(preset, 'id', 'Id')) + '">' + escapeHtml(describePreset(preset)) + '</option>';
@@ -225,6 +362,7 @@
             '<button type="button" class="transcoded-downloads-close" aria-label="Close">&times;</button>',
             '</div>',
             '<div class="transcoded-downloads-body">',
+            '<div class="transcoded-downloads-existing" hidden></div>',
             '<select class="transcoded-downloads-select" aria-label="Preset">' + options + '</select>',
             '<div class="transcoded-downloads-status"></div>',
             '<div class="transcoded-downloads-actions">',
@@ -242,6 +380,7 @@
         });
 
         document.body.appendChild(backdrop);
+        renderExistingJobs(backdrop, getItemJobs(jobs), presets);
     }
 
     function escapeHtml(value) {
@@ -254,14 +393,20 @@
     }
 
     function openDialog() {
-        request('/TranscodedDownloads/Presets')
-            .then(function (presets) {
+        Promise.all([
+            request('/TranscodedDownloads/Presets'),
+            request('/TranscodedDownloads/Jobs')
+        ])
+            .then(function (results) {
+                var presets = results[0];
+                var jobs = results[1];
+
                 if (!presets || !presets.length) {
                     showToast('No transcoded download presets are available.');
                     return;
                 }
 
-                renderDialog(presets);
+                renderDialog(presets, jobs || []);
             })
             .catch(function (error) {
                 showToast('Unable to load transcoded download presets. ' + (error.message || error));
@@ -294,6 +439,28 @@
             });
     }
 
+    function downloadJob(jobId) {
+        window.location.href = apiUrl('/TranscodedDownloads/Jobs/' + encodeURIComponent(jobId) + '/File');
+    }
+
+    function deleteJob(dialog, jobId, presets) {
+        setStatus(dialog, 'Removing job...');
+
+        request('/TranscodedDownloads/Jobs/' + encodeURIComponent(jobId), {
+            method: 'DELETE'
+        })
+            .then(function () {
+                return request('/TranscodedDownloads/Jobs');
+            })
+            .then(function (jobs) {
+                setStatus(dialog, '');
+                renderExistingJobs(dialog, getItemJobs(jobs), presets);
+            })
+            .catch(function (error) {
+                setStatus(dialog, error.message || 'Unable to remove job.');
+            });
+    }
+
     function pollJob(dialog, jobId, attempt) {
         if (attempt >= plugin.maxPollAttempts) {
             setStatus(dialog, 'The transcode is still running. Check the job list later.');
@@ -305,7 +472,7 @@
                 var status = normalizeStatus(getField(job, 'status', 'Status'));
                 if (status === jobStatus.completed) {
                     setStatus(dialog, 'Transcode complete. Opening download...');
-                    window.location.href = apiUrl('/TranscodedDownloads/Jobs/' + encodeURIComponent(jobId) + '/File');
+                    downloadJob(jobId);
                     removeDialog();
                     return;
                 }
@@ -321,6 +488,7 @@
                 }
 
                 setStatus(dialog, 'Transcoding... ' + Math.round(getField(job, 'progressPercent', 'ProgressPercent') || 0) + '%');
+                renderExistingJobs(dialog, getItemJobs([job]), dialog.transcodedDownloadsPresets || []);
                 window.setTimeout(function () {
                     pollJob(dialog, jobId, attempt + 1);
                 }, plugin.pollIntervalMs);
